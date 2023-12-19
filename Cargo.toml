@@ -1,0 +1,23 @@
+[package]
+name = "rfb"
+description = "Ratatui File Browser"
+authors = ["Paul Sobolik <psobolik@zoho.com>"]
+license = "MIT"
+categories = ["command-line-interface", "filesystem"]
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+color-eyre = "0.6.2"
+crossterm = { version = "0.27.0", features = ["event-stream"] }
+ratatui = "0.24.0"
+tokio = { version = "1.34.0", features = ["full"] }
+tokio-util = "0.7.10"
+futures = "0.3.29"
+chrono = "0.4.31"
+clap = { version = "4.4.11", features = ["derive"] }
+probably_binary = { version = "0.1.0", path = "../probably_binary" }
+number_prefix = "0.4.0"
