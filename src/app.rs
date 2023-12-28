@@ -31,6 +31,12 @@ const FOCUSED_BLOCK_STYLE: Style = Style::new()
     .fg(Color::LightBlue)
     .add_modifier(Modifier::BOLD);
 
+struct FrameSet {
+    head: Rect,
+    directory: Rect,
+    file: Rect,
+}
+
 #[derive(Default, PartialEq)]
 enum FocusedFrame {
     #[default]
@@ -72,7 +78,7 @@ impl App {
         match event {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
             Event::Init => self.handle_init_event().await,
-            Event::Resize(width, height) => self.handle_resize_event(width, height),
+            // Event::Resize(width, height) => self.handle_resize_event(width, height),
             _ => {}
         }
     }
@@ -82,18 +88,14 @@ impl App {
         self.load_selected_file().await;
     }
 
-    fn handle_resize_event(&mut self, width: u16, height: u16) {
-        // TODO: This replicates the logic in several render functions
-        let frame_rect = Rect::new(0, 0, width, height);
-        let root = Layout::default()
-            .constraints([Constraint::Length(1), Constraint::Min(1)])
-            .split(frame_rect);
-        let main = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-            .split(root[1]);
-        self.text_frame = main[1].inner(&Margin::new(1, 1));
-    }
+    // fn handle_resize_event(&mut self, _width: u16, _height: u16) {
+    //     let frame_set = calculate_frames(Rect::new(0, 0, width, height));
+    //     // Account for the padding applied when the file is rendered
+    //     self.text_frame = frame_set.file.inner(&Margin {
+    //         vertical: 0,
+    //         horizontal: 2,
+    //     });
+    // }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) {
         // Ctrl+C closes the app, regardless of state
@@ -378,7 +380,7 @@ impl App {
     fn horizontal_limit(&self) -> usize {
         let width = self.text_frame.width as usize;
         if self.widest_line_len > width {
-            self.widest_line_len - width + 2
+            self.widest_line_len - width
         } else {
             0
         }
@@ -577,30 +579,24 @@ impl App {
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let frame_rect = frame.size();
 
-        let root_layout = Layout::default()
-            .constraints([Constraint::Length(1), Constraint::Min(1)])
-            .split(frame_rect);
+        let frame_set = calculate_frames(frame_rect);
+        // Account for the padding applied when the file is rendered
+        self.text_frame = frame_set.file.inner(&Margin {
+            vertical: 0,
+            horizontal: 2,
+        });
+
+        self.render_directory(frame, frame_set.directory);
 
         if let Some(cwd) = self.cwd.clone() {
-            self.render_head(&cwd, frame, root_layout[0]);
+            self.render_head(&cwd, frame, frame_set.head);
         }
         if let Some(entry) = self.selected_item() {
-            self.render_main(&entry, frame, root_layout[1]);
+            self.render_file(&entry, frame, frame_set.file);
         }
-
         if let Some(error) = &self.error {
             self.render_error(error, frame, frame_rect);
         }
-    }
-
-    fn render_main(&mut self, entry: &Path, frame: &mut Frame<'_>, area: Rect) {
-        let main_layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-            .split(area);
-
-        self.render_directory(frame, main_layout[0]);
-        self.render_file(entry, frame, main_layout[1]);
     }
 
     fn render_head(&mut self, entry: &Path, frame: &mut Frame, area: Rect) {
@@ -921,4 +917,20 @@ fn widest_line_length(lines: &[String]) -> usize {
             }
         },
     )
+}
+
+fn calculate_frames(frame_rect: Rect) -> FrameSet {
+    let root = Layout::default()
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(frame_rect);
+    let main = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .split(root[1]);
+
+    FrameSet {
+        head: root[0],
+        directory: main[0],
+        file: main[1],
+    }
 }

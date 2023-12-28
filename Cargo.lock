@@ -670,7 +670,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rfe"
+name = "rfb"
 version = "0.1.0"
 dependencies = [
  "chrono",
