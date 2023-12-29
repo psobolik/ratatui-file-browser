@@ -78,7 +78,7 @@ impl App {
         match event {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
             Event::Init => self.handle_init_event().await,
-            // Event::Resize(width, height) => self.handle_resize_event(width, height),
+            Event::Resize(width, height) => self.handle_resize_event(width, height),
             _ => {}
         }
     }
@@ -88,14 +88,17 @@ impl App {
         self.load_selected_file().await;
     }
 
-    // fn handle_resize_event(&mut self, _width: u16, _height: u16) {
-    //     let frame_set = calculate_frames(Rect::new(0, 0, width, height));
-    //     // Account for the padding applied when the file is rendered
-    //     self.text_frame = frame_set.file.inner(&Margin {
-    //         vertical: 0,
-    //         horizontal: 2,
-    //     });
-    // }
+    fn handle_resize_event(&mut self, width: u16, height: u16) {
+        let frame_set = calculate_frames(Rect::new(0, 0, width, height));
+        // Account for the padding applied when the file is rendered
+        self.text_frame = frame_set.file.inner(&Margin {
+            vertical: 1,
+            horizontal: 2,
+        });
+        self.set_scrollbar_state();
+        self.set_horizontal_scrollbar_state();
+        self.set_vertical_scrollbar_state();
+    }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) {
         // Ctrl+C closes the app, regardless of state
@@ -213,10 +216,8 @@ impl App {
             }
             KeyCode::End => {
                 // Scroll to end of list
-                let max_offset =
-                    App::max_offset(&self.file_folder_list, self.text_frame.height as usize);
-                if self.file_folder_list.offset() < max_offset {
-                    self.file_folder_list.set_offset(max_offset);
+                if self.file_folder_list.len() > self.text_frame.height as usize {
+                    self.file_folder_list.set_offset(self.folder_vertical_page_limit());
                     self.folder_scrollbar_state.last();
                 }
             }
@@ -229,8 +230,7 @@ impl App {
             }
             KeyCode::Down => {
                 // Scroll down one line
-                if self.file_folder_list.offset()
-                    < App::max_offset(&self.file_folder_list, self.text_frame.height as usize)
+                if self.file_folder_list.offset() < self.folder_vertical_page_limit()
                 {
                     self.file_folder_list.next_offset();
                     self.sync_scrollbar_position();
@@ -253,7 +253,7 @@ impl App {
             KeyCode::PageDown => {
                 // Scroll down one page
                 let frame_height = self.text_frame.height as usize;
-                let max_offset = App::max_offset(&self.file_folder_list, frame_height);
+                let max_offset = self.folder_vertical_page_limit();
                 let offset = self.file_folder_list.offset() + frame_height;
                 if offset < max_offset {
                     self.file_folder_list.set_offset(offset);
@@ -265,6 +265,10 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn folder_vertical_page_limit(&self) -> usize {
+        page_limit(self.file_folder_list.len(), self.text_frame.height as usize)
     }
 
     fn sync_scrollbar_position(&mut self) {
@@ -290,13 +294,12 @@ impl App {
                 if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
                     // Scroll to bottom of file
                     if self.file_text.len() > self.text_frame.height as usize {
-                        let limit = self.file_text.len() - self.text_frame.height as usize;
-                        self.file_vertical_offset = limit;
+                        self.file_vertical_offset = self.file_vertical_page_limit();
                         self.file_vertical_scrollbar_state.last();
                     }
                 } else if self.can_scroll_horizontally() {
                     // Scroll to end of line
-                    self.file_horizontal_offset = self.horizontal_limit();
+                    self.file_horizontal_offset = self.file_horizontal_page_limit();
                     self.file_horizontal_scrollbar_state.last();
                 }
             }
@@ -310,9 +313,7 @@ impl App {
             KeyCode::Down => {
                 if self.can_scroll_vertically() {
                     // Scroll down one line
-                    let frame_height = self.text_frame.height as usize;
-                    let limit = self.file_text.len() - frame_height;
-                    if self.file_vertical_offset + 1 < limit {
+                    if self.file_vertical_offset < self.file_vertical_page_limit() {
                         self.file_vertical_offset += 1;
                         self.file_vertical_scrollbar_state.next();
                     }
@@ -337,7 +338,7 @@ impl App {
                 // Scroll down one page
                 if self.can_scroll_vertically() {
                     let frame_height = self.text_frame.height as usize;
-                    let limit = self.vertical_limit();
+                    let limit = self.file_vertical_page_limit();
                     if self.file_vertical_offset + frame_height < limit {
                         self.file_vertical_offset += frame_height;
                         self.file_vertical_scrollbar_state = self
@@ -359,7 +360,7 @@ impl App {
             KeyCode::Right => {
                 // Scroll right one character
                 if self.can_scroll_horizontally()
-                    && self.file_horizontal_offset < self.horizontal_limit()
+                    && self.file_horizontal_offset < self.file_horizontal_page_limit()
                 {
                     self.file_horizontal_offset += 1;
                     self.file_horizontal_scrollbar_state.next();
@@ -377,31 +378,12 @@ impl App {
         self.file_text.len() > self.text_frame.height as usize
     }
 
-    fn horizontal_limit(&self) -> usize {
-        let width = self.text_frame.width as usize;
-        if self.widest_line_len > width {
-            self.widest_line_len - width
-        } else {
-            0
-        }
+    fn file_vertical_page_limit(&self) -> usize {
+        page_limit(self.file_text.len(), self.text_frame.height as usize)
     }
 
-    fn vertical_limit(&self) -> usize {
-        let height = self.text_frame.height as usize;
-        let len = self.file_text.len();
-        if len > height {
-            len - height
-        } else {
-            0
-        }
-    }
-
-    fn max_offset<T>(stateful_list: &StatefulList<T>, page_height: usize) -> usize {
-        if stateful_list.upper_bound() > page_height {
-            stateful_list.upper_bound() - page_height
-        } else {
-            stateful_list.lower_bound()
-        }
+    fn file_horizontal_page_limit(&self) -> usize {
+        page_limit(self.widest_line_len, self.text_frame.width as usize)
     }
 
     fn selected_item(&self) -> Option<PathBuf> {
@@ -507,21 +489,25 @@ impl App {
     async fn load_folder(&mut self, entry: &Path) -> FolderItem {
         match read_directory(entry).await {
             Ok(items) => {
-                let height = self.text_frame.height as usize;
-                let len = items.len();
-                if len > height {
-                    self.folder_scrollbar_state = ScrollbarState::new(len - height).position(0);
-                } else {
-                    self.folder_scrollbar_state = ScrollbarState::default();
-                }
                 let strings = items
                     .iter()
                     .map(|entry| format!("{} {}", path_icon(entry), entry_name(entry)))
                     .collect();
                 self.file_folder_list = StatefulList::with_items(strings);
+                self.set_scrollbar_state();
                 FolderItem::Folder
             }
             Err(error) => FolderItem::Error(error.to_string()),
+        }
+    }
+
+    fn set_scrollbar_state(&mut self) {
+        let height = self.text_frame.height as usize;
+        let len = self.file_folder_list.upper_bound() + 1;
+        if len > height {
+            self.folder_scrollbar_state = ScrollbarState::new(len - height).position(0);
+        } else {
+            self.folder_scrollbar_state = ScrollbarState::default();
         }
     }
 
@@ -530,29 +516,13 @@ impl App {
             FileType::Text => match read_file(entry).await {
                 Ok(lines) => {
                     self.widest_line_len = widest_line_length(&lines);
-                    // Horizontal scrollbar
-                    self.file_horizontal_offset = 0;
-                    if self.widest_line_len > self.text_frame.width as usize {
-                        self.file_horizontal_scrollbar_state = ScrollbarState::new(
-                            self.widest_line_len - self.text_frame.width as usize,
-                        )
-                        .position(0);
-                    } else {
-                        self.file_horizontal_scrollbar_state = ScrollbarState::default();
-                        // Hides scrollbar
-                    };
-                    // Vertical scrollbar
-                    self.file_vertical_offset = 0;
-                    let height = self.text_frame.height as usize;
-                    let len = lines.len();
-                    if len > height {
-                        self.file_vertical_scrollbar_state =
-                            ScrollbarState::new(len - height).position(0);
-                    } else {
-                        self.file_vertical_scrollbar_state = ScrollbarState::default();
-                        // Hides scrollbar
-                    }
                     self.file_text = lines;
+
+                    self.file_horizontal_offset = 0;
+                    self.set_horizontal_scrollbar_state();
+
+                    self.file_vertical_offset = 0;
+                    self.set_vertical_scrollbar_state();
                     FolderItem::TextFile
                 }
                 Err(error) => FolderItem::Error(error.to_string()),
@@ -560,6 +530,33 @@ impl App {
             FileType::Binary => FolderItem::BinaryFile,
         }
     }
+
+    fn set_horizontal_scrollbar_state(&mut self) {
+        let line_width = self.widest_line_len;
+        let frame_width = self.text_frame.width as usize;
+        if line_width > self.text_frame.width as usize {
+            self.file_horizontal_scrollbar_state = ScrollbarState::new(
+                line_width - frame_width,
+            )
+            .position(0);
+        } else {
+            self.file_horizontal_scrollbar_state = ScrollbarState::default();
+            // Hides scrollbar
+        };
+    }
+
+    fn set_vertical_scrollbar_state(&mut self) {
+        let height = self.text_frame.height as usize;
+        let len = self.file_text.len();
+        if len > height {
+            self.file_vertical_scrollbar_state =
+                ScrollbarState::new(len - height).position(0);
+        } else {
+            self.file_vertical_scrollbar_state = ScrollbarState::default();
+            // Hides scrollbar
+        }
+    }
+
     async fn cd(&mut self) -> bool {
         if let Some(selected) = self.selected_item() {
             if selected.is_dir() {
@@ -582,7 +579,7 @@ impl App {
         let frame_set = calculate_frames(frame_rect);
         // Account for the padding applied when the file is rendered
         self.text_frame = frame_set.file.inner(&Margin {
-            vertical: 0,
+            vertical: 1,
             horizontal: 2,
         });
 
@@ -932,5 +929,13 @@ fn calculate_frames(frame_rect: Rect) -> FrameSet {
         head: root[0],
         directory: main[0],
         file: main[1],
+    }
+}
+
+fn page_limit(total_size: usize, page_size: usize) -> usize {
+    if total_size > page_size {
+        total_size - page_size
+    } else {
+        0
     }
 }

@@ -24,11 +24,14 @@ impl<T> StatefulList<T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
     pub fn lower_bound(&self) -> usize {
         0
     }
     pub fn upper_bound(&self) -> usize {
-        self.items.len() - 1
+        self.len() - 1
     }
 
     pub fn offset(&self) -> usize {

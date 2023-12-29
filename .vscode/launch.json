@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rfe'",
+            "name": "Debug executable 'rfb'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rfe",
-                    "--package=rfe"
+                    "--bin=rfb",
+                    "--package=rfb"
                 ],
                 "filter": {
-                    "name": "rfe",
+                    "name": "rfb",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'rfe'",
+            "name": "Debug unit tests in executable 'rfb'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=rfe",
-                    "--package=rfe"
+                    "--bin=rfb",
+                    "--package=rfb"
                 ],
                 "filter": {
-                    "name": "rfe",
+                    "name": "rfb",
                     "kind": "bin"
                 }
             },
