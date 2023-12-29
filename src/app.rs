@@ -10,7 +10,6 @@ use crossterm::event::KeyCode::Char;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use number_prefix::NumberPrefix;
 use probably_binary::{entry_type, EntryType, FileType};
-use ratatui::widgets::block::Title;
 use ratatui::{prelude::*, widgets::*};
 use std::cmp::Ordering;
 use std::fs::Metadata;
@@ -25,6 +24,7 @@ const DOCUMENT_ICON: char = '📄';
 const LINK_ICON: char = '🔗';
 const UNKNOWN_ICON: char = '❔';
 
+const OVERSIZE_FILE_STYLE: Style = Style::new().bg(Color::Yellow).fg(Color::Black);
 const BINARY_FILE_STYLE: Style = Style::new().bg(Color::Yellow).fg(Color::Black);
 const LIST_HIGHLIGHT_STYLE: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const ERROR_STYLE: Style = Style::new().fg(Color::Red);
@@ -48,6 +48,7 @@ enum FocusedFrame {
 enum FolderItem {
     Folder,
     TextFile,
+    OversizeTextFile,
     BinaryFile,
     Error(String),
 }
@@ -514,20 +515,26 @@ impl App {
 
     async fn load_file(&mut self, file_type: FileType, entry: &Path) -> FolderItem {
         match file_type {
-            FileType::Text => match read_file(entry).await {
-                Ok(lines) => {
-                    self.widest_line_len = widest_line_length(&lines);
-                    self.file_text = lines;
+            FileType::Text => {
+                if file_size(entry) >= 50_000 {
+                    FolderItem::OversizeTextFile
+                } else {
+                    match read_file(entry).await {
+                        Ok(lines) => {
+                            self.widest_line_len = widest_line_length(&lines);
+                            self.file_text = lines;
 
-                    self.file_horizontal_offset = 0;
-                    self.set_horizontal_scrollbar_state();
+                            self.file_horizontal_offset = 0;
+                            self.set_horizontal_scrollbar_state();
 
-                    self.file_vertical_offset = 0;
-                    self.set_vertical_scrollbar_state();
-                    FolderItem::TextFile
+                            self.file_vertical_offset = 0;
+                            self.set_vertical_scrollbar_state();
+                            FolderItem::TextFile
+                        }
+                        Err(error) => FolderItem::Error(error.to_string()),
+                    }
                 }
-                Err(error) => FolderItem::Error(error.to_string()),
-            },
+            }
             FileType::Binary => FolderItem::BinaryFile,
         }
     }
@@ -625,6 +632,7 @@ impl App {
                     match file_contents {
                         FolderItem::Folder => self.render_list_items_file(block, frame, area),
                         FolderItem::TextFile => self.render_text_file(block, frame, area),
+                        FolderItem::OversizeTextFile => self.render_oversize_text_file(block, frame, area),
                         FolderItem::BinaryFile => self.render_binary_file(block, frame, area),
                         FolderItem::Error(message) => {
                             self.render_file_error((&message).to_string(), block, frame, area)
@@ -693,6 +701,17 @@ impl App {
             }),
             &mut self.file_horizontal_scrollbar_state,
         );
+    }
+
+    fn render_oversize_text_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>, area: Rect) {
+        frame.render_widget(block, area);
+        frame.render_widget(
+            Paragraph::new(" Oversize Text File (Max 50 kb) ")
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: false })
+                .style(OVERSIZE_FILE_STYLE),
+            Rect::new(area.x + 2, area.y + 2, area.width - 4, 1),
+        )
     }
 
     fn render_binary_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>, area: Rect) {
@@ -857,6 +876,14 @@ fn metadata_size_string(metadata: &Metadata) -> String {
         NumberPrefix::Prefixed(prefix, n) => {
             format!("{:.0} {}B", n, prefix.symbol())
         }
+    }
+}
+
+fn file_size(path: &Path) -> u64 {
+    if let Ok(metadata) = path.metadata() {
+        metadata.len()
+    } else {
+        0
     }
 }
 
