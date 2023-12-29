@@ -31,7 +31,12 @@ impl<T> StatefulList<T> {
         0
     }
     pub fn upper_bound(&self) -> usize {
-        self.len() - 1
+        let len = self.len();
+        if len > 0 {
+            len - 1
+        } else {
+            0
+        }
     }
 
     pub fn offset(&self) -> usize {

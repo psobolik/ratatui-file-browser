@@ -13,6 +13,7 @@ use probably_binary::{entry_type, EntryType, FileType};
 use ratatui::widgets::block::Title;
 use ratatui::{prelude::*, widgets::*};
 use std::cmp::Ordering;
+use std::fs::Metadata;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -217,7 +218,8 @@ impl App {
             KeyCode::End => {
                 // Scroll to end of list
                 if self.file_folder_list.len() > self.text_frame.height as usize {
-                    self.file_folder_list.set_offset(self.folder_vertical_page_limit());
+                    self.file_folder_list
+                        .set_offset(self.folder_vertical_page_limit());
                     self.folder_scrollbar_state.last();
                 }
             }
@@ -230,8 +232,7 @@ impl App {
             }
             KeyCode::Down => {
                 // Scroll down one line
-                if self.file_folder_list.offset() < self.folder_vertical_page_limit()
-                {
+                if self.file_folder_list.offset() < self.folder_vertical_page_limit() {
                     self.file_folder_list.next_offset();
                     self.sync_scrollbar_position();
                 } else {
@@ -535,10 +536,8 @@ impl App {
         let line_width = self.widest_line_len;
         let frame_width = self.text_frame.width as usize;
         if line_width > self.text_frame.width as usize {
-            self.file_horizontal_scrollbar_state = ScrollbarState::new(
-                line_width - frame_width,
-            )
-            .position(0);
+            self.file_horizontal_scrollbar_state =
+                ScrollbarState::new(line_width - frame_width).position(0);
         } else {
             self.file_horizontal_scrollbar_state = ScrollbarState::default();
             // Hides scrollbar
@@ -549,8 +548,7 @@ impl App {
         let height = self.text_frame.height as usize;
         let len = self.file_text.len();
         if len > height {
-            self.file_vertical_scrollbar_state =
-                ScrollbarState::new(len - height).position(0);
+            self.file_vertical_scrollbar_state = ScrollbarState::new(len - height).position(0);
         } else {
             self.file_vertical_scrollbar_state = ScrollbarState::default();
             // Hides scrollbar
@@ -604,27 +602,38 @@ impl App {
     }
 
     fn render_file(&mut self, entry: &Path, frame: &mut Frame<'_>, area: Rect) {
-        let metadata = format!(
-            "[{} {}]",
-            entry_modified_string(entry),
-            file_size_string(entry),
-        );
-        let block = if self.focused_frame == FocusedFrame::Files {
-            focused_block()
-        } else {
-            default_block()
-        }
-        .title(Title::from(metadata));
+        match entry.metadata() {
+            Ok(metadata) => {
+                let size_string = if metadata.is_dir() {
+                    format!("{} items", self.file_folder_list.len())
+                } else {
+                    metadata_size_string(&metadata)
+                };
+                let title = format!(
+                    "[{} - {}]",
+                    metadata_modified_string(&metadata),
+                    size_string,
+                );
+                let block = if self.focused_frame == FocusedFrame::Files {
+                    focused_block()
+                } else {
+                    default_block()
+                }
+                .title(title);
 
-        if let Some(file_contents) = &self.folder_item {
-            match file_contents {
-                FolderItem::Folder => self.render_list_items_file(block, frame, area),
-                FolderItem::TextFile => self.render_text_file(block, frame, area),
-                FolderItem::BinaryFile => self.render_binary_file(block, frame, area),
-                FolderItem::Error(message) => {
-                    self.render_file_error((&message).to_string(), block, frame, area)
+                if let Some(file_contents) = &self.folder_item {
+                    match file_contents {
+                        FolderItem::Folder => self.render_list_items_file(block, frame, area),
+                        FolderItem::TextFile => self.render_text_file(block, frame, area),
+                        FolderItem::BinaryFile => self.render_binary_file(block, frame, area),
+                        FolderItem::Error(message) => {
+                            self.render_file_error((&message).to_string(), block, frame, area)
+                        }
+                    }
                 }
             }
+            // Why would there be no metadata?
+            Err(error) => self.error = Some(error.to_string()),
         }
     }
 
@@ -726,11 +735,18 @@ impl App {
                 )))
             })
             .collect();
+        // Don't include parent directory in count
+        let mut item_count = items.len();
+        if (entry_name(&self.directory_list[0]) == PARENT_DIRECTORY) && item_count > 0 {
+            item_count -= 1;
+        }
+        let item_count_string = format!("[{item_count} items]");
         let block = if self.focused_frame == FocusedFrame::Directory {
             focused_block()
         } else {
             default_block()
-        };
+        }
+        .title(item_count_string);
         let list = List::new(items)
             .block(block)
             .highlight_style(LIST_HIGHLIGHT_STYLE);
@@ -811,8 +827,8 @@ fn centered_rect(width: u16, height: u16, rect: Rect) -> Rect {
         .split(vert_layout[1])[1]
 }
 
-fn entry_modified_string(path: &Path) -> String {
-    match file_modified(path) {
+fn metadata_modified_string(metadata: &Metadata) -> String {
+    match modified_datetime(metadata) {
         Some(modified) => {
             format!("{}", modified.format("%Y-%m-%d %H:%M"))
         }
@@ -820,21 +836,28 @@ fn entry_modified_string(path: &Path) -> String {
     }
 }
 
-fn file_modified(path: &Path) -> Option<DateTime<Local>> {
-    if let Ok(modified) = path.metadata().map(|m| m.modified()) {
-        return match modified {
-            Ok(modified) => {
-                let dur = modified.duration_since(SystemTime::UNIX_EPOCH).unwrap();
-                Some::<DateTime<Local>>(
-                    chrono::DateTime::from_timestamp(dur.as_secs() as i64, 0)
-                        .unwrap()
-                        .into(),
-                )
-            }
-            _ => None, // No modified value
-        };
+fn modified_datetime(metadata: &Metadata) -> Option<DateTime<Local>> {
+    match metadata.modified() {
+        Ok(modified) => {
+            let dur = modified.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            Some::<DateTime<Local>>(
+                chrono::DateTime::from_timestamp(dur.as_secs() as i64, 0)
+                    .unwrap()
+                    .into(),
+            )
+        }
+        _ => None, // No modified value
     }
-    None // No metadata
+}
+
+fn metadata_size_string(metadata: &Metadata) -> String {
+    // Not meant to be precise...
+    match NumberPrefix::decimal(metadata.len() as f64) {
+        NumberPrefix::Standalone(_) => "1 kB".into(),
+        NumberPrefix::Prefixed(prefix, n) => {
+            format!("{:.0} {}B", n, prefix.symbol())
+        }
+    }
 }
 
 fn clip_string(string: &String, width: usize) -> String {
@@ -875,19 +898,6 @@ fn entry_path(path: &Path) -> String {
         }
     } else {
         "".into() // Path has no name
-    }
-}
-
-fn file_size_string(path: &Path) -> String {
-    if let Ok(len) = path.metadata().map(|m| m.len()) {
-        match NumberPrefix::decimal(len as f64) {
-            NumberPrefix::Standalone(_) => "1 kB".into(),
-            NumberPrefix::Prefixed(prefix, n) => {
-                format!("{:.0} {}B", n, prefix.symbol())
-            }
-        }
-    } else {
-        "".to_string()
     }
 }
 
