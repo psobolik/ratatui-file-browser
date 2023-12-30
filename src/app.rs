@@ -52,10 +52,15 @@ enum FolderItem {
     Error(String),
 }
 
+enum FsError {
+    Metadata(String),
+    Other(String),
+}
+
 #[derive(Default)]
 pub struct App {
     pub should_quit: bool,
-    error: Option<String>,
+    fs_error: Option<FsError>,
     text_frame: Rect,
     widest_line_len: usize,
     directory_list: StatefulList<PathBuf>,
@@ -107,10 +112,13 @@ impl App {
             self.quit();
             return;
         }
-        // If there's an error pending, any key will clear it and unselect the entry but nothing else
-        if self.error.is_some() {
-            self.error = None;
-            self.directory_list.unselect();
+        // If there's an error pending, clear it on any keypress and stop processing the event.
+        // If the error occurred reading the selected item's metadata, also clear the selection.
+        if self.fs_error.is_some() {
+            if let Some(FsError::Metadata(_)) = self.fs_error {
+                self.directory_list.unselect();
+            }
+            self.fs_error = None;
             return;
         }
         match key_event.code {
@@ -462,10 +470,7 @@ impl App {
                     EntryType::Directory => self.load_folder(entry).await,
                     EntryType::File(file_type) => self.load_file(file_type, entry).await,
                 },
-                Err(error) => {
-                    self.error = Some(error.to_string());
-                    FolderItem::Error(error.to_string())
-                }
+                Err(error) => FolderItem::Error(format!("Error selecting file: {error}")),
             });
         } else {
             self.folder_item = None;
@@ -496,7 +501,9 @@ impl App {
                 self.cwd = Some(cwd);
                 self.directory_list.first(); // Because no line is selected by default
             }
-            Err(error) => self.error = Some(error.to_string()),
+            Err(error) => {
+                self.fs_error = Some(FsError::Other(format!("Error loading directory: {error}")))
+            }
         }
     }
 
@@ -579,7 +586,10 @@ impl App {
             if selected.is_dir() {
                 match std::env::set_current_dir(selected) {
                     Ok(_) => self.load_cwd().await,
-                    Err(error) => self.error = Some(error.to_string()),
+                    Err(error) => {
+                        self.fs_error =
+                            Some(FsError::Other(format!("Error changing directory: {error}")))
+                    }
                 }
                 true
             } else {
@@ -608,8 +618,12 @@ impl App {
         if let Some(entry) = self.selected_item() {
             self.render_file(&entry, frame, frame_set.file);
         }
-        if let Some(error) = &self.error {
-            self.render_error(error, frame, frame_rect);
+        if let Some(fs_error) = &self.fs_error {
+            let message = match fs_error {
+                FsError::Metadata(message) => message,
+                FsError::Other(message) => message,
+            };
+            self.render_error(message, frame, frame_rect);
         }
     }
 
@@ -654,8 +668,12 @@ impl App {
                     }
                 }
             }
-            // Why would there be no metadata?
-            Err(error) => self.error = Some(error.to_string()),
+            // Why would there be no metadata? Possibly due to converting directory name from OS?
+            Err(error) => {
+                self.fs_error = Some(FsError::Metadata(format!(
+                    "Error reading metadata: {error}"
+                )))
+            }
         }
     }
 
