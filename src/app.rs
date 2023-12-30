@@ -139,76 +139,65 @@ impl App {
             self.set_selected(0);
             self.load_selected_file().await;
             // Don't process the Down key, though, so the first item stays selected in that case
-            if key_event.code == KeyCode::Down {
+            if is_down_key(key_event) {
                 return;
             }
         }
-        let selection_changed = match key_event.code {
-            KeyCode::Home => {
-                // Move selection to first entry
-                if self.directory_list.is_first() {
-                    false
-                } else {
-                    self.directory_list.first();
-                    true
-                }
+        let mut selection_changed = false;
+
+        if is_up_key(key_event) {
+            // Move selection up one entry
+            if !self.directory_list.is_first() {
+                self.directory_list.previous();
+                selection_changed = true;
             }
-            KeyCode::End => {
-                // Move selection to last entry
-                if self.directory_list.is_last() {
-                    false
-                } else {
-                    self.directory_list.last();
-                    true
-                }
+        } else if is_down_key(key_event) {
+            // Move selection down one entry
+            if !self.directory_list.is_last() {
+                self.directory_list.next();
+                selection_changed = true;
             }
-            KeyCode::Up => {
-                // Move selection up one entry
-                if self.directory_list.is_first() {
-                    false
-                } else {
-                    self.directory_list.previous();
-                    true
+        } else {
+            match key_event.code {
+                KeyCode::Home => {
+                    // Move selection to first entry
+                    if !self.directory_list.is_first() {
+                        self.directory_list.first();
+                        selection_changed = true;
+                    }
                 }
-            }
-            KeyCode::Down => {
-                // Move selection down one entry
-                if self.directory_list.is_last() {
-                    false
-                } else {
-                    self.directory_list.next();
-                    true
+                KeyCode::End => {
+                    // Move selection to last entry
+                    if !self.directory_list.is_last() {
+                        self.directory_list.last();
+                        selection_changed = true;
+                    }
                 }
-            }
-            KeyCode::PageUp => {
-                // Move selection up one page
-                if self.directory_list.is_first() {
-                    false
-                } else {
-                    self.directory_list.retreat(self.text_frame.height as usize);
-                    true
+                KeyCode::PageUp => {
+                    // Move selection up one page
+                    if !self.directory_list.is_first() {
+                        self.directory_list.retreat(self.text_frame.height as usize);
+                        selection_changed = true;
+                    }
                 }
-            }
-            KeyCode::PageDown => {
-                // Move selection down one page
-                if self.directory_list.is_last() {
-                    false
-                } else {
-                    self.directory_list.advance(self.text_frame.height as usize);
-                    true
+                KeyCode::PageDown => {
+                    // Move selection down one page
+                    if !self.directory_list.is_last() {
+                        self.directory_list.advance(self.text_frame.height as usize);
+                        selection_changed = true;
+                    }
                 }
-            }
-            // Open selected item if it's a folder
-            KeyCode::Enter => self.cd().await,
-            key_code => {
-                // Move selection to item starting with character
-                if let Char(c) = key_code {
-                    self.select_by_char(c).await
-                } else {
-                    false
+                // Open selected item if it's a folder
+                KeyCode::Enter => selection_changed = self.cd().await,
+                key_code => {
+                    // Move selection to item starting with character
+                    if let Char(c) = key_code {
+                        self.select_by_char(c).await;
+                        selection_changed = true;
+                    }
                 }
-            }
-        };
+            };
+        }
         if selection_changed {
             self.load_selected_file().await;
         }
@@ -225,64 +214,80 @@ impl App {
     }
 
     fn handle_folder_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Home => {
-                // Scroll to top of list
-                if !self.file_folder_list.at_offset_first() {
-                    self.file_folder_list.offset_first();
-                    self.folder_scrollbar_state.first();
+        if is_up_key(key_event) {
+            // Scroll up one line
+            if !self.file_folder_list.at_offset_first() {
+                self.file_folder_list.previous_offset();
+                self.sync_scrollbar_position();
+            }
+        } else if is_down_key(key_event) {
+            // Scroll down one line
+            if self.file_folder_list.offset() < self.folder_vertical_page_limit() {
+                self.file_folder_list.next_offset();
+                self.sync_scrollbar_position();
+            } else {
+                self.folder_scrollbar_state.last();
+            }
+        } else {
+            match key_event.code {
+                KeyCode::Home => {
+                    // Scroll to top of list
+                    if !self.file_folder_list.at_offset_first() {
+                        self.file_folder_list.offset_first();
+                        self.folder_scrollbar_state.first();
+                    }
                 }
-            }
-            KeyCode::End => {
-                // Scroll to end of list
-                if self.file_folder_list.len() > self.text_frame.height as usize {
-                    self.file_folder_list
-                        .set_offset(self.folder_vertical_page_limit());
-                    self.folder_scrollbar_state.last();
+                KeyCode::End => {
+                    // Scroll to end of list
+                    if self.file_folder_list.len() > self.text_frame.height as usize {
+                        self.file_folder_list
+                            .set_offset(self.folder_vertical_page_limit());
+                        self.folder_scrollbar_state.last();
+                    }
                 }
-            }
-            KeyCode::Up => {
-                // Scroll up one line
-                if !self.file_folder_list.at_offset_first() {
-                    self.file_folder_list.previous_offset();
-                    self.sync_scrollbar_position();
+                KeyCode::Up => {
+                    // Scroll up one line
+                    if !self.file_folder_list.at_offset_first() {
+                        self.file_folder_list.previous_offset();
+                        self.sync_scrollbar_position();
+                    }
                 }
-            }
-            KeyCode::Down => {
-                // Scroll down one line
-                if self.file_folder_list.offset() < self.folder_vertical_page_limit() {
-                    self.file_folder_list.next_offset();
-                    self.sync_scrollbar_position();
-                } else {
-                    self.folder_scrollbar_state.last();
+                KeyCode::Down => {
+                    // Scroll down one line
+                    if self.file_folder_list.offset() < self.folder_vertical_page_limit() {
+                        self.file_folder_list.next_offset();
+                        self.sync_scrollbar_position();
+                    } else {
+                        self.folder_scrollbar_state.last();
+                    }
                 }
+                KeyCode::PageUp => {
+                    // Scroll up one page
+                    let frame_height = self.text_frame.height as usize;
+                    if self.file_folder_list.offset() > frame_height {
+                        self.file_folder_list
+                            .set_offset(self.file_folder_list.offset() - frame_height);
+                        self.sync_scrollbar_position();
+                    } else {
+                        self.file_folder_list.offset_first();
+                        self.folder_scrollbar_state.first();
+                    };
+                }
+                KeyCode::PageDown => {
+                    // Scroll down one page
+                    let frame_height = self.text_frame.height as usize;
+                    let max_offset = self.folder_vertical_page_limit();
+                    let offset = self.file_folder_list.offset() + frame_height;
+                    if offset < max_offset {
+                        self.file_folder_list.set_offset(offset);
+                        self.sync_scrollbar_position();
+                    } else {
+                        self.file_folder_list.set_offset(max_offset);
+                        self.folder_scrollbar_state.last();
+                    };
+                }
+                _ => {}
             }
-            KeyCode::PageUp => {
-                // Scroll up one page
-                let frame_height = self.text_frame.height as usize;
-                if self.file_folder_list.offset() > frame_height {
-                    self.file_folder_list
-                        .set_offset(self.file_folder_list.offset() - frame_height);
-                    self.sync_scrollbar_position();
-                } else {
-                    self.file_folder_list.offset_first();
-                    self.folder_scrollbar_state.first();
-                };
-            }
-            KeyCode::PageDown => {
-                // Scroll down one page
-                let frame_height = self.text_frame.height as usize;
-                let max_offset = self.folder_vertical_page_limit();
-                let offset = self.file_folder_list.offset() + frame_height;
-                if offset < max_offset {
-                    self.file_folder_list.set_offset(offset);
-                    self.sync_scrollbar_position();
-                } else {
-                    self.file_folder_list.set_offset(max_offset);
-                    self.folder_scrollbar_state.last();
-                };
-            }
-            _ => {}
         }
     }
 
@@ -297,95 +302,97 @@ impl App {
     }
 
     fn handle_text_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Home => {
-                if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
-                    // Scroll to top of file
-                    self.file_vertical_offset = 0;
-                    self.file_vertical_scrollbar_state.first();
-                } else if self.can_scroll_horizontally() {
-                    // Go to beginning of line
-                    self.file_horizontal_offset = 0;
-                    self.file_horizontal_scrollbar_state.first();
+        if is_up_key(key_event) {
+            if self.can_scroll_vertically() && self.file_vertical_offset > 0 {
+                // Scroll up one line
+                self.file_vertical_offset -= 1;
+                self.file_vertical_scrollbar_state.prev();
+            }
+        } else if is_down_key(key_event) {
+            if self.can_scroll_vertically() {
+                // Scroll down one line
+                if self.file_vertical_offset < self.file_vertical_page_limit() {
+                    self.file_vertical_offset += 1;
+                    self.file_vertical_scrollbar_state.next();
                 }
             }
-            KeyCode::End => {
-                if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
-                    // Scroll to bottom of file
-                    if self.file_text.len() > self.text_frame.height as usize {
-                        self.file_vertical_offset = self.file_vertical_page_limit();
-                        self.file_vertical_scrollbar_state.last();
-                    }
-                } else if self.can_scroll_horizontally() {
-                    // Scroll to end of line
-                    self.file_horizontal_offset = self.file_horizontal_page_limit();
-                    self.file_horizontal_scrollbar_state.last();
-                }
-            }
-            KeyCode::Up => {
-                if self.can_scroll_vertically() && self.file_vertical_offset > 0 {
-                    // Scroll up one line
-                    self.file_vertical_offset -= 1;
-                    self.file_vertical_scrollbar_state.prev();
-                }
-            }
-            KeyCode::Down => {
-                if self.can_scroll_vertically() {
-                    // Scroll down one line
-                    if self.file_vertical_offset < self.file_vertical_page_limit() {
-                        self.file_vertical_offset += 1;
-                        self.file_vertical_scrollbar_state.next();
-                    }
-                }
-            }
-            KeyCode::PageUp => {
-                if self.can_scroll_vertically() {
-                    // Scroll up one page
-                    let frame_height = self.text_frame.height as usize;
-                    if self.file_vertical_offset > frame_height {
-                        self.file_vertical_offset -= frame_height;
-                        self.file_vertical_scrollbar_state = self
-                            .file_vertical_scrollbar_state
-                            .position(self.file_vertical_offset);
-                    } else {
+        } else {
+            match key_event.code {
+                KeyCode::Home => {
+                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
+                    {
+                        // Scroll to top of file
                         self.file_vertical_offset = 0;
                         self.file_vertical_scrollbar_state.first();
+                    } else if self.can_scroll_horizontally() {
+                        // Go to beginning of line
+                        self.file_horizontal_offset = 0;
+                        self.file_horizontal_scrollbar_state.first();
                     }
                 }
-            }
-            KeyCode::PageDown => {
-                // Scroll down one page
-                if self.can_scroll_vertically() {
-                    let frame_height = self.text_frame.height as usize;
-                    let limit = self.file_vertical_page_limit();
-                    if self.file_vertical_offset + frame_height < limit {
-                        self.file_vertical_offset += frame_height;
-                        self.file_vertical_scrollbar_state = self
-                            .file_vertical_scrollbar_state
-                            .position(self.file_vertical_offset);
-                    } else {
-                        self.file_vertical_offset = limit;
-                        self.file_vertical_scrollbar_state.last();
+                KeyCode::End => {
+                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
+                    {
+                        // Scroll to bottom of file
+                        if self.file_text.len() > self.text_frame.height as usize {
+                            self.file_vertical_offset = self.file_vertical_page_limit();
+                            self.file_vertical_scrollbar_state.last();
+                        }
+                    } else if self.can_scroll_horizontally() {
+                        // Scroll to end of line
+                        self.file_horizontal_offset = self.file_horizontal_page_limit();
+                        self.file_horizontal_scrollbar_state.last();
                     }
                 }
-            }
-            KeyCode::Left => {
-                // Scroll left one character
-                if self.can_scroll_horizontally() && self.file_horizontal_offset > 0 {
-                    self.file_horizontal_offset -= 1;
-                    self.file_horizontal_scrollbar_state.prev();
+                KeyCode::PageUp => {
+                    if self.can_scroll_vertically() {
+                        // Scroll up one page
+                        let frame_height = self.text_frame.height as usize;
+                        if self.file_vertical_offset > frame_height {
+                            self.file_vertical_offset -= frame_height;
+                            self.file_vertical_scrollbar_state = self
+                                .file_vertical_scrollbar_state
+                                .position(self.file_vertical_offset);
+                        } else {
+                            self.file_vertical_offset = 0;
+                            self.file_vertical_scrollbar_state.first();
+                        }
+                    }
                 }
-            }
-            KeyCode::Right => {
-                // Scroll right one character
-                if self.can_scroll_horizontally()
-                    && self.file_horizontal_offset < self.file_horizontal_page_limit()
-                {
-                    self.file_horizontal_offset += 1;
-                    self.file_horizontal_scrollbar_state.next();
+                KeyCode::PageDown => {
+                    // Scroll down one page
+                    if self.can_scroll_vertically() {
+                        let frame_height = self.text_frame.height as usize;
+                        let limit = self.file_vertical_page_limit();
+                        if self.file_vertical_offset + frame_height < limit {
+                            self.file_vertical_offset += frame_height;
+                            self.file_vertical_scrollbar_state = self
+                                .file_vertical_scrollbar_state
+                                .position(self.file_vertical_offset);
+                        } else {
+                            self.file_vertical_offset = limit;
+                            self.file_vertical_scrollbar_state.last();
+                        }
+                    }
                 }
+                KeyCode::Left => {
+                    // Scroll left one character
+                    if self.can_scroll_horizontally() && self.file_horizontal_offset > 0 {
+                        self.file_horizontal_offset -= 1;
+                        self.file_horizontal_scrollbar_state.prev();
+                    }
+                }
+                KeyCode::Right => {
+                    // Scroll right one character
+                    if self.can_scroll_horizontally()
+                        && self.file_horizontal_offset < self.file_horizontal_page_limit()
+                    {
+                        self.file_horizontal_offset += 1;
+                        self.file_horizontal_scrollbar_state.next();
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -1005,4 +1012,14 @@ fn page_limit(total_size: usize, page_size: usize) -> usize {
     } else {
         0
     }
+}
+
+fn is_up_key(key_event: KeyEvent) -> bool {
+    key_event.code == KeyCode::Up
+        || (Char('p') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
+}
+
+fn is_down_key(key_event: KeyEvent) -> bool {
+    key_event.code == KeyCode::Down
+        || (Char('n') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
 }
