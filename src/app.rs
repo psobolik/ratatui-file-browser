@@ -126,6 +126,16 @@ impl App {
         }
     }
     async fn handle_directory_key_event(&mut self, key_event: KeyEvent) {
+        // If nothing is selected, select the first item before processing
+        // the key, except down, because it seems odd to move to the second
+        // item in that case.
+        if self.directory_list.selected().is_none() {
+            self.set_selected(0);
+            self.load_selected_file().await;
+            if key_event.code == KeyCode::Down {
+                return;
+            }
+        }
         let selection_changed = match key_event.code {
             KeyCode::Home => {
                 // Move selection to first entry
@@ -452,6 +462,13 @@ impl App {
                 Ok(entry_type) => match entry_type {
                     EntryType::Directory => self.load_folder(entry).await,
                     EntryType::File(file_type) => self.load_file(file_type, entry).await,
+                    EntryType::Symlink => {
+                        // Screw symlinks
+                        self.directory_list.unselect();
+                        let error = "Symlinks are not supported";
+                        self.error = Some(error.to_string());
+                        FolderItem::Error(error.to_string())
+                    }
                 },
                 Err(error) => FolderItem::Error(error.to_string()),
             });
