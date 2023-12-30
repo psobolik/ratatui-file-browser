@@ -7,7 +7,25 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rfb'",
+            "name": "Debug 'rfb' root",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rfb",
+                    "--package=rfb"
+                ],
+                "filter": {
+                    "name": "rfb",
+                    "kind": "bin"
+                }
+            },
+            "args": ["/"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug 'rfb'",
             "cargo": {
                 "args": [
                     "build",
@@ -25,7 +43,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'rfb'",
+            "name": "Debug unit tests in 'rfb'",
             "cargo": {
                 "args": [
                     "test",

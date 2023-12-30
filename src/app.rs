@@ -21,7 +21,6 @@ use tokio::fs;
 const PARENT_DIRECTORY: &str = "..";
 const DIRECTORY_ICON: char = '📁';
 const DOCUMENT_ICON: char = '📄';
-const LINK_ICON: char = '🔗';
 const UNKNOWN_ICON: char = '❔';
 
 const OVERSIZE_FILE_STYLE: Style = Style::new().bg(Color::Yellow).fg(Color::Black);
@@ -108,9 +107,10 @@ impl App {
             self.quit();
             return;
         }
-        // If there's an error pending, any key will clear it and do nothing else
+        // If there's an error pending, any key will clear it and unselect the entry but nothing else
         if self.error.is_some() {
             self.error = None;
+            self.directory_list.unselect();
             return;
         }
         match key_event.code {
@@ -126,6 +126,15 @@ impl App {
         }
     }
     async fn handle_directory_key_event(&mut self, key_event: KeyEvent) {
+        // If nothing is selected, select the first item before processing the key
+        if self.directory_list.selected().is_none() {
+            self.set_selected(0);
+            self.load_selected_file().await;
+            // Don't process the Down key, though, so the first item stays selected in that case
+            if key_event.code == KeyCode::Down {
+                return;
+            }
+        }
         let selection_changed = match key_event.code {
             KeyCode::Home => {
                 // Move selection to first entry
@@ -453,7 +462,10 @@ impl App {
                     EntryType::Directory => self.load_folder(entry).await,
                     EntryType::File(file_type) => self.load_file(file_type, entry).await,
                 },
-                Err(error) => FolderItem::Error(error.to_string()),
+                Err(error) => {
+                    self.error = Some(error.to_string());
+                    FolderItem::Error(error.to_string())
+                }
             });
         } else {
             self.folder_item = None;
@@ -632,7 +644,9 @@ impl App {
                     match file_contents {
                         FolderItem::Folder => self.render_list_items_file(block, frame, area),
                         FolderItem::TextFile => self.render_text_file(block, frame, area),
-                        FolderItem::OversizeTextFile => self.render_oversize_text_file(block, frame, area),
+                        FolderItem::OversizeTextFile => {
+                            self.render_oversize_text_file(block, frame, area)
+                        }
                         FolderItem::BinaryFile => self.render_binary_file(block, frame, area),
                         FolderItem::Error(message) => {
                             self.render_file_error((&message).to_string(), block, frame, area)
@@ -933,8 +947,6 @@ fn path_icon(entry: &Path) -> char {
         DIRECTORY_ICON
     } else if entry.is_file() {
         DOCUMENT_ICON
-    } else if entry.is_symlink() {
-        LINK_ICON
     } else {
         UNKNOWN_ICON
     }
