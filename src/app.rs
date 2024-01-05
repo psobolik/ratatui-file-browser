@@ -16,6 +16,7 @@ use std::fs::Metadata;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use ratatui::widgets::block::{Position, Title};
 use tokio::fs;
 
 const PARENT_DIRECTORY: &str = "..";
@@ -77,6 +78,7 @@ pub struct App {
     file_vertical_scrollbar_state: ScrollbarState,
     file_horizontal_offset: usize,
     file_vertical_offset: usize,
+    wrap: bool,
 }
 
 impl App {
@@ -119,6 +121,11 @@ impl App {
                 self.directory_list.unselect();
             }
             self.fs_error = None;
+            return;
+        }
+        // Ctrl+W toggles wrapping, no matter which pane has focus
+        if Char('w') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL {
+            self.wrap = !self.wrap;
             return;
         }
         match key_event.code {
@@ -694,12 +701,22 @@ impl App {
             .iter()
             .map(|item| Line::from(item.to_string()))
             .collect();
+        let block = if self.wrap {
+            block.title(Title::from("[Word wrap]").alignment(Alignment::Center).position(Position::Bottom))
+        } else {
+            block
+        };
         let paragraph = Paragraph::new(items.clone())
             .scroll((
                 self.file_vertical_offset as u16,
                 self.file_horizontal_offset as u16,
             ))
             .block(block);
+        let paragraph = if self.wrap {
+            paragraph.wrap(Wrap { trim: false })
+        } else {
+            paragraph
+        };
 
         frame.render_widget(paragraph, area);
 
@@ -714,16 +731,17 @@ impl App {
             &mut self.file_vertical_scrollbar_state,
         );
 
-        let horizontal_scrollbar =
-            Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
-        frame.render_stateful_widget(
-            horizontal_scrollbar,
-            area.inner(&Margin {
-                vertical: 0,
-                horizontal: 1,
-            }),
-            &mut self.file_horizontal_scrollbar_state,
-        );
+        if !self.wrap {
+            let horizontal_scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
+            frame.render_stateful_widget(
+                horizontal_scrollbar,
+                area.inner(&Margin {
+                    vertical: 0,
+                    horizontal: 1,
+                }),
+                &mut self.file_horizontal_scrollbar_state,
+            );
+        }
     }
 
     fn render_oversize_text_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>, area: Rect) {
