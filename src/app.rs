@@ -245,22 +245,6 @@ impl App {
                         self.folder_scrollbar_state.last();
                     }
                 }
-                KeyCode::Up => {
-                    // Scroll up one line
-                    if !self.file_folder_list.at_offset_first() {
-                        self.file_folder_list.previous_offset();
-                        self.sync_scrollbar_position();
-                    }
-                }
-                KeyCode::Down => {
-                    // Scroll down one line
-                    if self.file_folder_list.offset() < self.folder_vertical_page_limit() {
-                        self.file_folder_list.next_offset();
-                        self.sync_scrollbar_position();
-                    } else {
-                        self.folder_scrollbar_state.last();
-                    }
-                }
                 KeyCode::PageUp => {
                     // Scroll up one page
                     let frame_height = self.text_frame.height as usize;
