@@ -10,13 +10,13 @@ use crossterm::event::KeyCode::Char;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use number_prefix::NumberPrefix;
 use probably_binary::{entry_type, EntryType, FileType};
+use ratatui::widgets::block::{Position, Title};
 use ratatui::{prelude::*, widgets::*};
 use std::cmp::Ordering;
 use std::fs::Metadata;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use ratatui::widgets::block::{Position, Title};
 use tokio::fs;
 
 const PARENT_DIRECTORY: &str = "..";
@@ -70,7 +70,7 @@ pub struct App {
     // This tells us what kind of thing the selected item represents
     folder_item: Option<FolderItem>,
     // If the item selected is a folder, this holds its entries
-    file_folder_list: StatefulList<String>,
+    file_folder_list: StatefulList<PathBuf>,
     folder_scrollbar_state: ScrollbarState,
     // If the item selected is a text file, this holds its contents
     file_text: Vec<String>,
@@ -475,32 +475,34 @@ impl App {
         }
     }
 
-    async fn read_cwd(&mut self) -> io::Result<(PathBuf, Vec<PathBuf>)> {
-        let cwd = std::env::current_dir()?;
-        match read_directory(&cwd).await {
-            Ok(entries) => {
-                let mut result = vec![];
-                if cwd.parent().is_some() {
-                    let mut p = cwd.clone();
-                    p.push(PARENT_DIRECTORY);
-                    result.push(p);
-                }
-                result.extend(entries);
-                Ok((cwd, result))
-            }
-            Err(error) => Err(error),
-        }
-    }
-
     async fn load_cwd(&mut self) {
-        match self.read_cwd().await {
-            Ok((cwd, items)) => {
-                self.directory_list = StatefulList::with_items(items);
-                self.cwd = Some(cwd);
-                self.directory_list.first(); // Because no line is selected by default
+        match std::env::current_dir() {
+            Ok(cwd) => {
+                match read_directory(&cwd).await {
+                    Ok(entries) => {
+                        let mut result = vec![];
+                        // Prepend parent directory entry if there is one
+                        if cwd.parent().is_some() {
+                            let mut p = cwd.clone();
+                            p.push(PARENT_DIRECTORY);
+                            result.push(p);
+                        }
+                        result.extend(entries);
+                        self.directory_list = StatefulList::with_items(result);
+                        self.directory_list.first(); // Because no line is selected by default
+                        self.cwd = Some(cwd);
+                    }
+                    Err(error) => {
+                        self.fs_error =
+                            Some(FsError::Other(format!("Error loading directory: {error}")))
+                    }
+                }
             }
             Err(error) => {
-                self.fs_error = Some(FsError::Other(format!("Error loading directory: {error}")))
+                self.cwd = None;
+                self.fs_error = Some(FsError::Other(format!(
+                    "Error reading current directory: {error}"
+                )))
             }
         }
     }
@@ -508,11 +510,7 @@ impl App {
     async fn load_folder(&mut self, entry: &Path) -> FolderItem {
         match read_directory(entry).await {
             Ok(items) => {
-                let strings = items
-                    .iter()
-                    .map(|entry| format!("{} {}", path_icon(entry), entry_name(entry)))
-                    .collect();
-                self.file_folder_list = StatefulList::with_items(strings);
+                self.file_folder_list = StatefulList::with_items(items);
                 self.set_scrollbar_state();
                 FolderItem::Folder
             }
@@ -654,7 +652,7 @@ impl App {
 
                 if let Some(file_contents) = &self.folder_item {
                     match file_contents {
-                        FolderItem::Folder => self.render_list_items_file(block, frame, area),
+                        FolderItem::Folder => self.render_folder_list(block, frame, area),
                         FolderItem::TextFile => self.render_text_file(block, frame, area),
                         FolderItem::OversizeTextFile => {
                             self.render_oversize_text_file(block, frame, area)
@@ -666,7 +664,7 @@ impl App {
                     }
                 }
             }
-            // Why would there be no metadata? Possibly due to converting directory name from OS?
+            // Why would there be no metadata? (It happens on my Mac.)
             Err(error) => {
                 self.fs_error = Some(FsError::Metadata(format!(
                     "Error reading metadata: {error}"
@@ -675,12 +673,8 @@ impl App {
         }
     }
 
-    fn render_list_items_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>, area: Rect) {
-        let items: Vec<ListItem> = self
-            .file_folder_list
-            .iter()
-            .map(|item| ListItem::new(Line::from(item.to_string())))
-            .collect();
+    fn render_folder_list(&mut self, block: Block<'_>, frame: &mut Frame<'_>, area: Rect) {
+        let items = list_items(&self.file_folder_list, self.text_frame.height as usize);
         let list = List::new(items).block(block);
         frame.render_stateful_widget(list, area, &mut self.file_folder_list.state);
 
@@ -702,7 +696,11 @@ impl App {
             .map(|item| Line::from(item.to_string()))
             .collect();
         let block = if self.wrap {
-            block.title(Title::from("[Word wrap]").alignment(Alignment::Center).position(Position::Bottom))
+            block.title(
+                Title::from("[Word wrap]")
+                    .alignment(Alignment::Center)
+                    .position(Position::Bottom),
+            )
         } else {
             block
         };
@@ -732,7 +730,8 @@ impl App {
         );
 
         if !self.wrap {
-            let horizontal_scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
+            let horizontal_scrollbar =
+                Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
             frame.render_stateful_widget(
                 horizontal_scrollbar,
                 area.inner(&Margin {
@@ -784,19 +783,9 @@ impl App {
     }
 
     fn render_directory(&mut self, frame: &mut Frame, area: Rect) {
-        let items: Vec<ListItem> = self
-            .directory_list
-            .iter()
-            .map(|entry| {
-                ListItem::new(Line::from(format!(
-                    "{} {}",
-                    path_icon(entry),
-                    entry_name(entry)
-                )))
-            })
-            .collect();
+        let items = list_items(&self.directory_list, self.text_frame.height as usize);
         // Don't include parent directory in count
-        let mut item_count = items.len();
+        let mut item_count = self.directory_list.len();
         if (entry_name(&self.directory_list[0]) == PARENT_DIRECTORY) && item_count > 0 {
             item_count -= 1;
         }
@@ -833,22 +822,23 @@ async fn read_file(path: &Path) -> io::Result<Vec<String>> {
 }
 
 async fn read_directory(path: &Path) -> io::Result<Vec<PathBuf>> {
-    let mut paths: Vec<PathBuf> = vec![];
+    let mut paths: Vec<(bool, PathBuf)> = vec![];
     let mut entries = fs::read_dir(&path).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        paths.push(entry.path());
+    while let Some(dir_entry) = entries.next_entry().await? {
+        let entry = dir_entry.path();
+        paths.push((entry.is_dir(), entry));
     }
     // Sort by name, directories first
-    paths.sort_unstable_by(|lhs, rhs| {
-        if lhs.is_dir() && !rhs.is_dir() {
+    paths.sort_unstable_by(|(lhs_is_dir, lhs_path), (rhs_is_dir, rhs_path)| {
+        if *lhs_is_dir && !*rhs_is_dir {
             Ordering::Less
-        } else if !lhs.is_dir() && rhs.is_dir() {
+        } else if !*lhs_is_dir && *rhs_is_dir {
             Ordering::Greater
         } else {
-            lhs.file_name().cmp(&rhs.file_name())
+            lhs_path.file_name().cmp(&rhs_path.file_name())
         }
     });
-    Ok(paths)
+    Ok(paths.iter().map(|(_, path)| path.clone()).collect())
 }
 
 fn focused_block<'a>() -> Block<'a> {
@@ -1024,4 +1014,23 @@ fn is_up_key(key_event: KeyEvent) -> bool {
 fn is_down_key(key_event: KeyEvent) -> bool {
     key_event.code == KeyCode::Down
         || (Char('n') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
+}
+
+fn list_items<'a>(paths: &StatefulList<PathBuf>, height: usize) -> Vec<ListItem<'a>> {
+    let offset = paths.state.offset();
+    paths
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            if index < offset || index > offset + height {
+                ListItem::new("") // Off screen
+            } else {
+                ListItem::new(Line::from(format!(
+                    "{} {}",
+                    path_icon(entry),
+                    entry_name(entry)
+                )))
+            }
+        })
+        .collect()
 }
