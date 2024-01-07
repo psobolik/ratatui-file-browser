@@ -10,7 +10,6 @@ use crossterm::event::KeyCode::Char;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use number_prefix::NumberPrefix;
 use probably_binary::{entry_type, EntryType, FileType};
-use ratatui::widgets::block::{Position, Title};
 use ratatui::{prelude::*, widgets::*};
 use std::cmp::Ordering;
 use std::fs::Metadata;
@@ -78,7 +77,6 @@ pub struct App {
     file_vertical_scrollbar_state: ScrollbarState,
     file_horizontal_offset: usize,
     file_vertical_offset: usize,
-    wrap: bool,
 }
 
 impl App {
@@ -121,11 +119,6 @@ impl App {
                 self.directory_list.unselect();
             }
             self.fs_error = None;
-            return;
-        }
-        // Ctrl+W toggles wrapping, no matter which pane has focus
-        if Char('w') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL {
-            self.wrap = !self.wrap;
             return;
         }
         match key_event.code {
@@ -310,26 +303,22 @@ impl App {
         } else {
             match key_event.code {
                 KeyCode::Home => {
-                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
-                    {
+                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
                         // Scroll to top of file
                         self.file_vertical_offset = 0;
                         self.file_vertical_scrollbar_state.first();
-                    } else if self.can_scroll_horizontally() {
+                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL {
                         // Go to beginning of line
                         self.file_horizontal_offset = 0;
                         self.file_horizontal_scrollbar_state.first();
                     }
                 }
                 KeyCode::End => {
-                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
-                    {
+                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
                         // Scroll to bottom of file
-                        if self.file_text.len() > self.text_frame.height as usize {
-                            self.file_vertical_offset = self.file_vertical_page_limit();
-                            self.file_vertical_scrollbar_state.last();
-                        }
-                    } else if self.can_scroll_horizontally() {
+                        self.file_vertical_offset = self.file_vertical_page_limit();
+                        self.file_vertical_scrollbar_state.last();
+                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL {
                         // Scroll to end of line
                         self.file_horizontal_offset = self.file_horizontal_page_limit();
                         self.file_horizontal_scrollbar_state.last();
@@ -695,26 +684,12 @@ impl App {
             .iter()
             .map(|item| Line::from(item.to_string()))
             .collect();
-        let block = if self.wrap {
-            block.title(
-                Title::from("[Word wrap]")
-                    .alignment(Alignment::Center)
-                    .position(Position::Bottom),
-            )
-        } else {
-            block
-        };
         let paragraph = Paragraph::new(items.clone())
             .scroll((
                 self.file_vertical_offset as u16,
                 self.file_horizontal_offset as u16,
             ))
             .block(block);
-        let paragraph = if self.wrap {
-            paragraph.wrap(Wrap { trim: false })
-        } else {
-            paragraph
-        };
 
         frame.render_widget(paragraph, area);
 
@@ -729,18 +704,16 @@ impl App {
             &mut self.file_vertical_scrollbar_state,
         );
 
-        if !self.wrap {
-            let horizontal_scrollbar =
-                Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
-            frame.render_stateful_widget(
-                horizontal_scrollbar,
-                area.inner(&Margin {
-                    vertical: 0,
-                    horizontal: 1,
-                }),
-                &mut self.file_horizontal_scrollbar_state,
-            );
-        }
+        let horizontal_scrollbar =
+            Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
+        frame.render_stateful_widget(
+            horizontal_scrollbar,
+            area.inner(&Margin {
+                vertical: 0,
+                horizontal: 1,
+            }),
+            &mut self.file_horizontal_scrollbar_state,
+        );
     }
 
     fn render_oversize_text_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>, area: Rect) {
