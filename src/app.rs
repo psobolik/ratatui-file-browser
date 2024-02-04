@@ -303,22 +303,28 @@ impl App {
         } else {
             match key_event.code {
                 KeyCode::Home => {
-                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
+                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
+                    {
                         // Scroll to top of file
                         self.file_vertical_offset = 0;
                         self.file_vertical_scrollbar_state.first();
-                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL {
+                    } else if self.can_scroll_horizontally()
+                        && key_event.modifiers != KeyModifiers::CONTROL
+                    {
                         // Go to beginning of line
                         self.file_horizontal_offset = 0;
                         self.file_horizontal_scrollbar_state.first();
                     }
                 }
                 KeyCode::End => {
-                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL {
+                    if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
+                    {
                         // Scroll to bottom of file
                         self.file_vertical_offset = self.file_vertical_page_limit();
                         self.file_vertical_scrollbar_state.last();
-                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL {
+                    } else if self.can_scroll_horizontally()
+                        && key_event.modifiers != KeyModifiers::CONTROL
+                    {
                         // Scroll to end of line
                         self.file_horizontal_offset = self.file_horizontal_page_limit();
                         self.file_horizontal_scrollbar_state.last();
