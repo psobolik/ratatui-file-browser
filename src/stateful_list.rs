@@ -9,12 +9,7 @@ pub struct StatefulList<T> {
     pub(crate) state: ListState,
     items: Vec<T>,
 }
-/*
-pub struct ListState {
-    offset: usize,
-    selected: Option<usize>,
-}
-*/
+
 #[allow(dead_code)]
 impl<T> StatefulList<T> {
     pub fn with_items(items: Vec<T>) -> StatefulList<T> {
@@ -98,8 +93,12 @@ impl<T> StatefulList<T> {
         self.items.iter()
     }
 
-    pub fn first(&mut self) {
+    pub fn first(&mut self) -> bool {
+        if self.is_first() {
+            return false;
+        }
         self.set_selected(Some(self.lower_bound()));
+        true
     }
     pub fn is_first(&self) -> bool {
         match self.selected() {
@@ -108,8 +107,12 @@ impl<T> StatefulList<T> {
         }
     }
 
-    pub fn last(&mut self) {
+    pub fn last(&mut self) -> bool {
+        if self.is_last() {
+            return false;
+        }
         self.set_selected(Some(self.upper_bound()));
+        true
     }
     pub fn is_last(&self) -> bool {
         match self.selected() {
@@ -118,30 +121,38 @@ impl<T> StatefulList<T> {
         }
     }
 
-    pub fn advance(&mut self, distance: usize) {
+    pub fn advance(&mut self, distance: usize) -> bool {
+        if self.is_last() {
+            return false;
+        }
         let selected = self.selected().unwrap_or(self.lower_bound());
         let new = selected + distance;
         if new < self.upper_bound() {
-            self.set_selected(Some(new))
+            self.set_selected(Some(new));
         } else {
-            self.last()
+            self.last();
         }
+        true
     }
 
-    pub fn retreat(&mut self, distance: usize) {
+    pub fn retreat(&mut self, distance: usize) -> bool {
+        if self.is_first() {
+            return false;
+        }
         let selected = self.selected().unwrap_or(self.lower_bound());
         if selected < distance {
-            self.first()
+            self.first();
         } else {
             self.set_selected(Some(selected - distance));
         }
+        true
     }
 
-    pub fn next(&mut self) {
+    pub fn next(&mut self) -> bool {
         self.advance(1)
     }
 
-    pub fn previous(&mut self) {
+    pub fn previous(&mut self) -> bool {
         self.retreat(1)
     }
 

@@ -147,45 +147,28 @@ impl App {
 
         if is_up_key(key_event) {
             // Move selection up one entry
-            if !self.directory_list.is_first() {
-                self.directory_list.previous();
-                selection_changed = true;
-            }
+            selection_changed = self.directory_list.previous();
         } else if is_down_key(key_event) {
             // Move selection down one entry
-            if !self.directory_list.is_last() {
-                self.directory_list.next();
-                selection_changed = true;
-            }
+            selection_changed = self.directory_list.next();
         } else {
             match key_event.code {
                 KeyCode::Home => {
                     // Move selection to first entry
-                    if !self.directory_list.is_first() {
-                        self.directory_list.first();
-                        selection_changed = true;
-                    }
+                    selection_changed = self.directory_list.first();
                 }
                 KeyCode::End => {
                     // Move selection to last entry
-                    if !self.directory_list.is_last() {
-                        self.directory_list.last();
-                        selection_changed = true;
-                    }
+                    selection_changed = self.directory_list.last();
                 }
                 KeyCode::PageUp => {
                     // Move selection up one page
-                    if !self.directory_list.is_first() {
+                    selection_changed =
                         self.directory_list.retreat(self.text_frame.height as usize);
-                        selection_changed = true;
-                    }
                 }
                 KeyCode::PageDown => {
                     // Move selection down one page
-                    if !self.directory_list.is_last() {
-                        self.directory_list.advance(self.text_frame.height as usize);
-                        selection_changed = true;
-                    }
+                    selection_changed = self.directory_list.advance(self.text_frame.height as usize)
                 }
                 // Open selected item if it's a folder
                 KeyCode::Enter => selection_changed = self.cd().await,
@@ -576,19 +559,18 @@ impl App {
         if let Some(selected) = self.selected_item() {
             if selected.is_dir() {
                 match std::env::set_current_dir(selected) {
-                    Ok(_) => self.load_cwd().await,
+                    Ok(_) => {
+                        self.load_cwd().await;
+                        return true;
+                    }
                     Err(error) => {
                         self.fs_error =
                             Some(FsError::Other(format!("Error changing directory: {error}")))
                     }
                 }
-                true
-            } else {
-                false
             }
-        } else {
-            false
         }
+        false
     }
 
     pub fn render(&mut self, frame: &mut Frame<'_>) {
@@ -760,7 +742,6 @@ impl App {
             Rect::new(area.x + 2, area.y + 2, area.width - 4, area.height - 4),
         )
     }
-
     fn render_directory(&mut self, frame: &mut Frame, area: Rect) {
         let items = list_items(&self.directory_list, self.text_frame.height as usize);
         // Don't include parent directory in count
@@ -781,8 +762,8 @@ impl App {
         frame.render_stateful_widget(list, area, &mut self.directory_list.state);
     }
 
-    fn render_error(&self, error: &String, frame: &mut Frame, frame_size: Rect) {
-        let text = Paragraph::new(Text::from(error.as_str())).style(ERROR_STYLE);
+    fn render_error(&self, error: &str, frame: &mut Frame, frame_size: Rect) {
+        let text = Paragraph::new(Text::from(error)).style(ERROR_STYLE);
         let block = Block::default().title("Error").borders(Borders::ALL);
 
         let error_len = error.len() as u16;
