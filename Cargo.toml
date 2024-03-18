@@ -20,4 +20,4 @@ futures = "0.3.29"
 chrono = "0.4.31"
 clap = { version = "4.4.11", features = ["derive"] }
 number_prefix = "0.4.0"
-probably_binary = { version = "0.1.0", path = "probably_binary" }
+probably_binary = { git = "http://marconi/gitea/psobolik/probably_binary.git" }

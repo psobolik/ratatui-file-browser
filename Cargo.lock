@@ -623,6 +623,7 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 [[package]]
 name = "probably_binary"
 version = "0.1.0"
+source = "git+http://marconi/gitea/psobolik/probably_binary.git#1a6ebf4535494de22714670abdd7ab347a26ed93"
 
 [[package]]
 name = "proc-macro2"
