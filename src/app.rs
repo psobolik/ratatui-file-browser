@@ -205,10 +205,6 @@ impl App {
     async fn load_selected_item(&mut self) {
         if let Some(entry) = self.directory.selected_item() {
             let entry = entry.as_path();
-            if let Err(error) = util::is_file_or_folder(entry) {
-                self.preview.set_error(entry, error);
-                return;
-            }
             match entry_type(entry) {
                 Ok(entry_type) => match entry_type {
                     EntryType::Directory => {

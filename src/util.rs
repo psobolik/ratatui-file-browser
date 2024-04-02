@@ -155,17 +155,3 @@ pub fn file_size(path: &Path) -> u64 {
 pub fn is_in_rect(x: u16, y: u16, rect: Rect) -> bool {
     x >= rect.left() && x < rect.right() && y >= rect.top() && y < rect.bottom()
 }
-
-pub fn is_file_or_folder(path: &Path) -> Result<(), String> {
-    let metadata = match path.metadata() {
-        Ok(metadata) => metadata,
-        Err(error) => return Err(error.to_string()),
-    };
-    if metadata.is_dir() {
-        Ok(())
-    } else if metadata.is_file() {
-        Ok(())
-    } else {
-        Err("Unsupported file type".to_string())
-    }
-}

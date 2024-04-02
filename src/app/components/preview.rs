@@ -7,6 +7,7 @@ use crate::{app::styles, stateful_list::StatefulList, util};
 use chrono::{DateTime, Local};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use number_prefix::NumberPrefix;
+use ratatui::prelude::Style;
 use ratatui::{
     layout::{Alignment, Margin, Rect},
     prelude::{Line, Text},
@@ -24,6 +25,7 @@ enum PreviewItem {
     TextFile,
     OversizeTextFile,
     BinaryFile,
+    OtherFile,
     Error(String),
 }
 
@@ -113,6 +115,11 @@ impl Preview {
     pub fn set_binary_file(&mut self, entry: &Path) {
         self.entry = Some(PathBuf::from(entry));
         self.preview_item = Some(PreviewItem::BinaryFile);
+    }
+
+    pub fn set_other_file(&mut self, entry: &Path) {
+        self.entry = Some(PathBuf::from(entry));
+        self.preview_item = Some(PreviewItem::OtherFile);
     }
 
     pub fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -375,6 +382,7 @@ impl Preview {
                             self.render_oversize_text_file(block, frame)
                         }
                         PreviewItem::BinaryFile => self.render_binary_file(block, frame),
+                        PreviewItem::OtherFile => self.render_other_file(block, frame),
                         PreviewItem::Error(message) => {
                             self.render_file_error((&message).to_string(), block, frame)
                         }
@@ -451,24 +459,40 @@ impl Preview {
     }
 
     fn render_oversize_text_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>) {
-        frame.render_widget(block, self.area);
-
-        frame.render_widget(
-            Paragraph::new(" Oversize Text File (Max 50 kb) ")
-                .alignment(Alignment::Center)
-                .wrap(Wrap { trim: false })
-                .style(styles::OVERSIZE_FILE_STYLE),
-            Rect::new(self.area.x + 2, self.area.y + 2, self.area.width - 4, 1),
+        self.render_unrenderable_file(
+            "Oversize Text File (Max 50 kb)",
+            styles::OVERSIZE_FILE_STYLE,
+            block,
+            frame,
         )
     }
 
     fn render_binary_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>) {
+        self.render_unrenderable_file("Binary File", styles::BINARY_FILE_STYLE, block, frame)
+    }
+
+    fn render_other_file(&mut self, block: Block<'_>, frame: &mut Frame<'_>) {
+        self.render_unrenderable_file(
+            "Unsupported File Type",
+            styles::OTHER_FILE_STYLE,
+            block,
+            frame,
+        )
+    }
+
+    fn render_unrenderable_file(
+        &mut self,
+        message: &str,
+        style: Style,
+        block: Block<'_>,
+        frame: &mut Frame<'_>,
+    ) {
         frame.render_widget(block, self.area);
         frame.render_widget(
-            Paragraph::new(" Binary File ")
+            Paragraph::new(message)
                 .alignment(Alignment::Center)
                 .wrap(Wrap { trim: false })
-                .style(styles::BINARY_FILE_STYLE),
+                .style(style),
             Rect::new(self.area.x + 2, self.area.y + 2, self.area.width - 4, 1),
         )
     }
