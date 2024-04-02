@@ -3,14 +3,13 @@
  * Created 2024-03-18
  */
 mod components;
-mod fs_error;
 mod styles;
 
 use crate::app::{
     components::directory::Directory, components::head::Head, components::preview::Preview,
-    fs_error::FsError,
 };
 use crate::{constants, tui::Event, util};
+use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent, KeyModifiers},
@@ -33,7 +32,7 @@ struct FrameSet {
 #[derive(Default)]
 pub struct App {
     pub should_quit: bool,
-    fs_error: Option<FsError>,
+    fs_error: Option<std::io::Error>,
     // Components
     head: Head,
     directory: Directory,
@@ -46,6 +45,7 @@ impl App {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
             Event::Init => self.handle_init_event().await,
             Event::Resize(width, height) => self.handle_resize_event(width, height),
+            Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event).await,
             _ => {}
         }
     }
@@ -64,19 +64,88 @@ impl App {
         self.preview.handle_resize_event(frame_set.preview);
     }
 
+    fn maybe_clear_error(&mut self) -> bool {
+        // If there's an error pending, clear it.
+        if self.fs_error.is_some() {
+            self.fs_error = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
+        match mouse_event.kind {
+            // This is to prevent mouse events we don't handle from clearing the error,
+            // (Especially Up and Moved.)
+            MouseEventKind::Down(..) | MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
+                // If there is an error showing, clear it and don't process the event.
+                if self.maybe_clear_error() {
+                    return;
+                }
+            }
+            // Ignore mouse events we don't handle. (Why not?)
+            _ => return,
+        }
+
+        match mouse_event.kind {
+            MouseEventKind::Down(mouse_button) => {
+                match mouse_button {
+                    MouseButton::Left => {
+                        if self.directory.hit_test(mouse_event.column, mouse_event.row) {
+                            if self.directory.has_focus()
+                                && self.directory.select_row(mouse_event.row)
+                            {
+                                self.load_selected_item().await;
+                            } else {
+                                self.focus_directory();
+                            }
+                        } else if self.directory.has_focus()
+                            && self.preview.hit_test(mouse_event.column, mouse_event.row)
+                        {
+                            self.focus_preview();
+                        }
+                    }
+                    // Right-click on the selected item in the directory will change the directory
+                    MouseButton::Right => {
+                        if self.directory.has_focus()
+                            && self
+                                .directory
+                                .is_selected(self.directory.index_from_row(mouse_event.row))
+                        {
+                            self.fake_key(KeyCode::Enter, KeyModifiers::NONE).await;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                self.fake_key(KeyCode::Up, KeyModifiers::NONE).await;
+            }
+            MouseEventKind::ScrollDown => {
+                self.fake_key(KeyCode::Down, KeyModifiers::NONE).await;
+            }
+            _ => { /* ignore */ }
+        }
+    }
+
+    async fn fake_key(&mut self, key_code: KeyCode, modifiers: KeyModifiers) {
+        let key_event = KeyEvent::new(key_code, modifiers);
+        if self.directory.has_focus() {
+            self.handle_directory_key_event(key_event).await;
+        } else if self.preview.has_focus() {
+            self.preview.handle_key_event(key_event);
+        }
+    }
+
     async fn handle_key_event(&mut self, key_event: KeyEvent) {
         // Ctrl+C closes the app, regardless of state
         if Char('c') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL {
             self.quit();
             return;
         }
-        // If there's an error pending, clear it on any keypress and stop processing the event.
-        // If the error occurred reading the selected item's metadata, also clear the selection.
-        if self.fs_error.is_some() {
-            if let Some(FsError::Metadata(_)) = self.fs_error {
-                self.directory.clear_selection();
-            }
-            self.fs_error = None;
+        // If there is an error showing, clear it and don't process the event.
+        if self.maybe_clear_error() {
             return;
         }
         match key_event.code {
@@ -112,17 +181,36 @@ impl App {
     }
 
     fn toggle_focus(&mut self) {
-        let directory_has_focus = self.directory.has_focus();
-        self.directory.set_focus(!directory_has_focus);
-        self.preview.set_focus(directory_has_focus);
+        if self.directory.has_focus() {
+            self.focus_preview()
+        } else {
+            self.focus_directory()
+        }
+    }
+
+    fn focus_directory(&mut self) {
+        if !self.directory.has_focus() {
+            self.directory.set_focus(true);
+            self.preview.set_focus(false);
+        }
+    }
+
+    fn focus_preview(&mut self) {
+        if !self.preview.has_focus() {
+            self.directory.set_focus(false);
+            self.preview.set_focus(true);
+        }
     }
 
     async fn load_selected_item(&mut self) {
         if let Some(entry) = self.directory.selected_item() {
             let entry = entry.as_path();
+            if let Err(error) = util::is_file_or_folder(entry) {
+                self.preview.set_error(entry, error);
+                return;
+            }
             match entry_type(entry) {
                 Ok(entry_type) => match entry_type {
-                    // EntryType::Directory => self.load_folder(entry).await,
                     EntryType::Directory => {
                         match read_directory(entry).await {
                             Ok(entries) => self.preview.set_folder_items(entry, entries),
@@ -132,8 +220,7 @@ impl App {
                     EntryType::File(file_type) => self.load_file(file_type, entry).await,
                 },
                 Err(error) => {
-                    self.preview
-                        .set_error(entry, format!("Error selecting file: {error}"));
+                    self.preview.set_error(entry, error.to_string());
                 }
             };
         } else {
@@ -157,12 +244,12 @@ impl App {
                         self.directory.set_items(result);
                         self.head.set_path(Some(cwd));
                     }
-                    Err(error) => self.fs_error = Some(FsError::Directory(error)),
+                    Err(error) => self.fs_error = Some(error),
                 }
             }
             Err(error) => {
                 self.head.set_path(None);
-                self.fs_error = Some(FsError::Directory(error))
+                self.fs_error = Some(error)
             }
         }
     }
@@ -197,11 +284,7 @@ impl App {
         }
 
         if let Some(fs_error) = &self.fs_error {
-            let message = match fs_error {
-                FsError::Metadata(message) => message,
-                FsError::Directory(message) => message,
-            };
-            self.render_error(&message.to_string(), frame, frame_rect);
+            self.render_error(&fs_error.to_string(), frame, frame_rect);
         }
     }
 

@@ -157,7 +157,7 @@ impl<T> StatefulList<T> {
     }
 
     pub fn unselect(&mut self) {
-        self.state.select(None);
+        self.set_selected(None);
     }
 }
 

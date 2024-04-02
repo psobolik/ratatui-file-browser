@@ -3,7 +3,7 @@
  * Created 2024-03-17
  */
 
-use crate::app::{fs_error::FsError, styles};
+use crate::app::styles;
 use crate::{constants, stateful_list::StatefulList, util};
 use crossterm::{
     event::KeyCode::Char,
@@ -28,6 +28,10 @@ impl Directory {
         self
     }
 
+    pub fn hit_test(&self, x: u16, y: u16) -> bool {
+        util::is_in_rect(x, y, self.rect)
+    }
+
     pub fn handle_resize_event(&mut self, rect: Rect) {
         self.rect = rect;
     }
@@ -38,11 +42,31 @@ impl Directory {
         self
     }
 
-    pub fn clear_selection(&mut self) {
-        self.items.unselect();
+    pub fn is_selected(&self, index: usize) -> bool {
+        match self.items.state.selected() {
+            Some(selected) => selected == index,
+            None => false,
+        }
     }
 
-    pub fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(bool, bool), FsError> {
+    pub fn index_from_row(&self, row: u16) -> usize {
+        (row - self.rect.y - 1) as usize + self.items.state.offset()
+    }
+
+    pub fn select_row(&mut self, row: u16) -> bool {
+        let row = self.index_from_row(row);
+        if row < self.items.len() {
+            self.set_selected(row);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn handle_key_event(
+        &mut self,
+        key_event: KeyEvent,
+    ) -> Result<(bool, bool), std::io::Error> {
         // If nothing is selected, select the first item before processing the key
         if self.items.selected().is_none() {
             self.items.set_selected(Some(0));
@@ -97,13 +121,11 @@ impl Directory {
         Ok((selection_changed, directory_changed))
     }
 
-    fn cd(&mut self) -> Result<bool, FsError> {
+    fn cd(&mut self) -> Result<bool, std::io::Error> {
         if let Some(selected) = self.selected_item() {
             if selected.is_dir() {
-                return match std::env::set_current_dir(selected) {
-                    Ok(_) => Ok(true),
-                    Err(error) => Err(FsError::Directory(error)),
-                };
+                let _ = std::env::set_current_dir(selected)?;
+                return Ok(true);
             }
         }
         Ok(false)
@@ -136,8 +158,7 @@ impl Directory {
             });
         // Don't change the selection unless a match was made
         if let Some(index) = index {
-            self.set_selected(index);
-            true
+            self.set_selected(index)
         } else {
             false
         }
@@ -150,6 +171,7 @@ impl Directory {
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+        self.rect = area;
         let items = util::list_items(&self.items, frame.size().height as usize);
         // Don't include parent directory in count
         let mut item_count = self.items.len();
@@ -167,6 +189,5 @@ impl Directory {
             .block(block)
             .highlight_style(styles::LIST_HIGHLIGHT_STYLE);
         frame.render_stateful_widget(list, area, &mut self.items.state);
-        self.rect = area;
     }
 }

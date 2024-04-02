@@ -8,6 +8,7 @@ use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent, KeyModifiers},
 };
+use ratatui::layout::Rect;
 use ratatui::{
     prelude::{Color, Line, Modifier, Style},
     widgets::{Block, BorderType, Borders, ListItem, Padding},
@@ -87,7 +88,7 @@ fn path_icon(entry: &Path) -> char {
 pub fn focused_block<'a>() -> Block<'a> {
     Block::default()
         .borders(Borders::ALL)
-        .border_type(BorderType::Thick)
+        .border_type(BorderType::Double)
         .border_style(FOCUSED_BLOCK_STYLE)
         .padding(Padding::horizontal(1))
 }
@@ -148,5 +149,23 @@ pub fn file_size(path: &Path) -> u64 {
         metadata.len()
     } else {
         0
+    }
+}
+
+pub fn is_in_rect(x: u16, y: u16, rect: Rect) -> bool {
+    x >= rect.left() && x < rect.right() && y >= rect.top() && y < rect.bottom()
+}
+
+pub fn is_file_or_folder(path: &Path) -> Result<(), String> {
+    let metadata = match path.metadata() {
+        Ok(metadata) => metadata,
+        Err(error) => return Err(error.to_string()),
+    };
+    if metadata.is_dir() {
+        Ok(())
+    } else if metadata.is_file() {
+        Ok(())
+    } else {
+        Err("Unsupported file type".to_string())
     }
 }

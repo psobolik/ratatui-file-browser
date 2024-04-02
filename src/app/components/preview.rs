@@ -3,11 +3,7 @@
  * Created 2024-03-18
  */
 
-use crate::{
-    app::{fs_error::FsError, styles},
-    stateful_list::StatefulList,
-    util,
-};
+use crate::{app::styles, stateful_list::StatefulList, util};
 use chrono::{DateTime, Local};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use number_prefix::NumberPrefix;
@@ -64,6 +60,10 @@ impl Preview {
     pub fn set_focus(&mut self, focus: bool) -> &mut Self {
         self.has_focus = focus;
         self
+    }
+
+    pub fn hit_test(&self, x: u16, y: u16) -> bool {
+        util::is_in_rect(x, y, self.area)
     }
 
     pub fn handle_resize_event(&mut self, rect: Rect) {
@@ -314,8 +314,11 @@ impl Preview {
         let height = self.inner_area.height as usize;
         let len = self.file_folder_list.upper_bound() + 1;
         if len > height {
-            self.folder_scrollbar_state = ScrollbarState::new(len - height).position(0);
+            self.folder_scrollbar_state = ScrollbarState::new(len)
+                .position(0)
+                .viewport_content_length(height);
         } else {
+            // Hide unneeded scrollbar
             self.folder_scrollbar_state = ScrollbarState::default();
         }
     }
@@ -324,11 +327,12 @@ impl Preview {
         let line_width = self.widest_line_len;
         let frame_width = self.inner_area.width as usize;
         if line_width > self.inner_area.width as usize {
-            self.file_horizontal_scrollbar_state =
-                ScrollbarState::new(line_width - frame_width).position(0);
+            self.file_horizontal_scrollbar_state = ScrollbarState::new(line_width)
+                .position(0)
+                .viewport_content_length(frame_width);
         } else {
+            // Hide unneeded scrollbar
             self.file_horizontal_scrollbar_state = ScrollbarState::default();
-            // Hides scrollbar
         };
     }
 
@@ -336,44 +340,47 @@ impl Preview {
         let height = self.inner_area.height as usize;
         let len = self.file_text.len();
         if len > height {
-            self.file_vertical_scrollbar_state = ScrollbarState::new(len - height).position(0);
+            self.file_vertical_scrollbar_state = ScrollbarState::new(len)
+                .position(0)
+                .viewport_content_length(height);
         } else {
+            // Hide unneeded scrollbar
             self.file_vertical_scrollbar_state = ScrollbarState::default();
-            // Hides scrollbar
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<(), FsError> {
+    pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<(), std::io::Error> {
         self.set_area(area);
 
         if let Some(entry) = &self.entry {
-            match entry.metadata() {
-                Ok(metadata) => {
-                    let title = self.title(&metadata);
-                    let block = if self.has_focus {
-                        util::focused_block()
-                    } else {
-                        util::default_block()
-                    }
-                    .title(title);
+            let block = if self.has_focus {
+                util::focused_block()
+            } else {
+                util::default_block()
+            };
+            if let Some(PreviewItem::Error(message)) = &self.preview_item {
+                self.render_file_error(message.to_string(), block, frame);
+                return Ok(());
+            }
+            let metadata = entry.metadata()?;
+            {
+                let title = self.title(&metadata);
+                let block = block.title(title);
 
-                    if let Some(file_contents) = &self.preview_item {
-                        match file_contents {
-                            PreviewItem::Folder => self.render_folder_list(block, frame),
-                            PreviewItem::TextFile => self.render_text_file(block, frame),
-                            PreviewItem::OversizeTextFile => {
-                                self.render_oversize_text_file(block, frame)
-                            }
-                            PreviewItem::BinaryFile => self.render_binary_file(block, frame),
-                            PreviewItem::Error(message) => {
-                                self.render_file_error((&message).to_string(), block, frame)
-                            }
+                if let Some(file_contents) = &self.preview_item {
+                    match file_contents {
+                        PreviewItem::Folder => self.render_folder_list(block, frame),
+                        PreviewItem::TextFile => self.render_text_file(block, frame),
+                        PreviewItem::OversizeTextFile => {
+                            self.render_oversize_text_file(block, frame)
+                        }
+                        PreviewItem::BinaryFile => self.render_binary_file(block, frame),
+                        PreviewItem::Error(message) => {
+                            self.render_file_error((&message).to_string(), block, frame)
                         }
                     }
-                    Ok(())
                 }
-                // Why would there be no metadata? (It happens on my Mac.)
-                Err(error) => Err(FsError::Metadata(error)),
+                Ok(())
             }
         } else {
             Ok(())
@@ -384,13 +391,9 @@ impl Preview {
         let size_string = if metadata.is_dir() {
             format!("{} items", self.file_folder_list.len())
         } else {
-            metadata_size_string(&metadata)
+            metadata_size_string(metadata)
         };
-        let title = format!(
-            "[{} - {}]",
-            metadata_modified_string(&metadata),
-            size_string,
-        );
+        let title = format!("[{} - {}]", metadata_modified_string(metadata), size_string,);
         title
     }
 
@@ -403,7 +406,7 @@ impl Preview {
         let scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
         frame.render_stateful_widget(
             scrollbar,
-            self.inner_area.inner(&Margin {
+            self.area.inner(&Margin {
                 vertical: 1,
                 horizontal: 0,
             }),

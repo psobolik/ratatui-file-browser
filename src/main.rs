@@ -12,7 +12,7 @@ use color_eyre::eyre::Result;
 use tui::Event;
 
 async fn run() -> Result<()> {
-    let mut tui = tui::Tui::new()?.tick_rate(1.0).frame_rate(30.0);
+    let mut tui = tui::Tui::new()?.tick_rate(1.0).frame_rate(30.0).mouse(true);
     tui.enter()?;
     let mut app = App::default();
 
