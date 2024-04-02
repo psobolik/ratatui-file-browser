@@ -218,6 +218,7 @@ impl App {
                         };
                     }
                     EntryType::File(file_type) => self.load_file(file_type, entry).await,
+                    EntryType::Other => self.preview.set_other_file(entry),
                 },
                 Err(error) => {
                     self.preview.set_error(entry, error.to_string());
