@@ -3,7 +3,9 @@
  * Created 2024-03-17
  */
 
-use crate::app::styles;
+use crate::app::components::Component;
+use crate::app::{components, styles};
+use crate::tui::Event;
 use crate::{constants, stateful_list::StatefulList, util};
 use crossterm::{
     event::KeyCode::Char,
@@ -11,68 +13,40 @@ use crossterm::{
 };
 use ratatui::{layout::Rect, widgets::List, Frame};
 use std::path::PathBuf;
+use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Default)]
 pub struct Directory {
     items: StatefulList<PathBuf>,
     has_focus: bool,
-    rect: Rect,
+    area: Rect,
+    event_tx: Option<UnboundedSender<Event>>,
 }
-impl Directory {
-    pub fn has_focus(&self) -> bool {
+
+impl Component for Directory {
+    fn has_focus(&self) -> bool {
         self.has_focus
     }
 
-    pub fn set_focus(&mut self, focus: bool) -> &mut Directory {
+    fn set_focus(&mut self, focus: bool) {
         self.has_focus = focus;
-        self
     }
 
-    pub fn hit_test(&self, x: u16, y: u16) -> bool {
-        util::is_in_rect(x, y, self.rect)
+    fn hit_test(&self, x: u16, y: u16) -> bool {
+        util::is_in_rect(x, y, self.area)
     }
 
-    pub fn handle_resize_event(&mut self, rect: Rect) {
-        self.rect = rect;
+    fn handle_resize_event(&mut self, area: Rect) {
+        self.area = area;
     }
 
-    pub fn set_items(&mut self, items: Vec<PathBuf>) -> &mut Directory {
-        self.items = StatefulList::with_items(items);
-        self.items.first(); // Because no line is selected by default
-        self
-    }
-
-    pub fn is_selected(&self, index: usize) -> bool {
-        match self.items.state.selected() {
-            Some(selected) => selected == index,
-            None => false,
-        }
-    }
-
-    pub fn index_from_row(&self, row: u16) -> usize {
-        (row - self.rect.y - 1) as usize + self.items.state.offset()
-    }
-
-    pub fn select_row(&mut self, row: u16) -> bool {
-        let row = self.index_from_row(row);
-        if row < self.items.len() {
-            self.set_selected(row);
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn handle_key_event(
-        &mut self,
-        key_event: KeyEvent,
-    ) -> Result<(bool, bool), std::io::Error> {
+    async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
         // If nothing is selected, select the first item before processing the key
         if self.items.selected().is_none() {
             self.items.set_selected(Some(0));
             // Don't process the Down key, though, so the first item stays selected in that case
             if util::is_down_key(key_event) {
-                return Ok((false, false));
+                return Ok(());
             }
         }
         let mut selection_changed = false;
@@ -96,11 +70,11 @@ impl Directory {
                 }
                 KeyCode::PageUp => {
                     // Move selection up one page
-                    selection_changed = self.items.retreat(self.rect.height as usize);
+                    selection_changed = self.items.retreat(self.area.height as usize);
                 }
                 KeyCode::PageDown => {
                     // Move selection down one page
-                    selection_changed = self.items.advance(self.rect.height as usize)
+                    selection_changed = self.items.advance(self.area.height as usize)
                 }
                 // Open selected item if it's a folder
                 KeyCode::Enter => {
@@ -118,13 +92,100 @@ impl Directory {
                 }
             };
         }
-        Ok((selection_changed, directory_changed))
+        if directory_changed {
+            self.load_cwd().await?;
+        }
+        if selection_changed {
+            self.event_tx
+                .as_ref()
+                .unwrap()
+                .send(Event::SelectionChanged)
+                .expect("Panic sending selection changed event");
+        }
+        Ok(())
+    }
+
+    fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<(), std::io::Error> {
+        self.area = area;
+
+        let items = util::list_items(&self.items, frame.size().height as usize);
+        // Don't include parent directory in count
+        let mut item_count = self.items.len();
+        if (util::entry_name(&self.items[0]) == constants::PARENT_DIRECTORY) && item_count > 0 {
+            item_count -= 1;
+        }
+        let item_count_string = format!("[{item_count} items]");
+        let block = if self.has_focus {
+            util::focused_block()
+        } else {
+            util::default_block()
+        }
+        .title(item_count_string);
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(styles::LIST_HIGHLIGHT_STYLE);
+        frame.render_stateful_widget(list, area, &mut self.items.state);
+
+        Ok(())
+    }
+}
+
+impl Directory {
+    pub fn set_event_tx(&mut self, event_tx: Option<UnboundedSender<Event>>) {
+        self.event_tx = event_tx;
+    }
+
+    pub fn set_items(&mut self, items: Vec<PathBuf>) -> &mut Directory {
+        self.items = StatefulList::with_items(items);
+        self.items.first(); // Because no line is selected by default
+        self
+    }
+
+    pub fn is_selected(&self, index: usize) -> bool {
+        match self.items.state.selected() {
+            Some(selected) => selected == index,
+            None => false,
+        }
+    }
+
+    pub fn index_from_row(&self, row: u16) -> usize {
+        (row - self.area.y - 1) as usize + self.items.state.offset()
+    }
+
+    pub fn select_row(&mut self, row: u16) -> bool {
+        let row = self.index_from_row(row);
+        if row < self.items.len() {
+            self.set_selected(row);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub async fn load_cwd(&mut self) -> Result<(), std::io::Error> {
+        let cwd = std::env::current_dir()?;
+        let entries = components::read_directory(&cwd).await?;
+        let mut result = vec![];
+        // Prepend parent directory entry if there is one
+        if cwd.parent().is_some() {
+            let mut p = cwd.clone();
+            p.push(constants::PARENT_DIRECTORY);
+            result.push(p);
+        }
+        result.extend(entries);
+        self.set_items(result);
+        self.event_tx
+            .as_ref()
+            .unwrap()
+            .send(Event::DirectoryChanged)
+            .expect("Panic sending directory changed event");
+        Ok(())
     }
 
     fn cd(&mut self) -> Result<bool, std::io::Error> {
         if let Some(selected) = self.selected_item() {
             if selected.is_dir() {
-                let _ = std::env::set_current_dir(selected)?;
+                std::env::set_current_dir(selected)?;
                 return Ok(true);
             }
         }
@@ -170,24 +231,4 @@ impl Directory {
             .map(|selected| self.items[selected].clone())
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        self.rect = area;
-        let items = util::list_items(&self.items, frame.size().height as usize);
-        // Don't include parent directory in count
-        let mut item_count = self.items.len();
-        if (util::entry_name(&self.items[0]) == constants::PARENT_DIRECTORY) && item_count > 0 {
-            item_count -= 1;
-        }
-        let item_count_string = format!("[{item_count} items]");
-        let block = if self.has_focus {
-            util::focused_block()
-        } else {
-            util::default_block()
-        }
-        .title(item_count_string);
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(styles::LIST_HIGHLIGHT_STYLE);
-        frame.render_stateful_widget(list, area, &mut self.items.state);
-    }
 }

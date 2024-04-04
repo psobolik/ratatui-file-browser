@@ -1,0 +1,75 @@
+/*
+ * Copyright (c) 2024 Paul Sobolik
+ * Created 2024-04-03
+ */
+
+use std::fs::Metadata;
+use std::io::Error;
+use std::time::SystemTime;
+
+use chrono::{DateTime, Local};
+use number_prefix::NumberPrefix;
+use ratatui::layout::Rect;
+use ratatui::Frame;
+
+pub trait PreviewPane {
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, has_focus: bool) -> Result<(), Error>;
+
+    fn page_limit(total_size: usize, page_size: usize) -> usize {
+        if total_size > page_size {
+            total_size - page_size
+        } else {
+            0
+        }
+    }
+}
+
+pub fn file_title(metadata: &Metadata) -> String {
+    format!(
+        "[{} - {}]",
+        metadata_modified_string(metadata),
+        metadata_size_string(metadata)
+    )
+}
+
+pub fn folder_title(metadata: &Metadata, item_count: usize) -> String {
+    format!(
+        "[{} - {} item{}]",
+        metadata_modified_string(metadata),
+        item_count,
+        if item_count != 1 { "s" } else { "" },
+    )
+}
+
+fn metadata_modified_string(metadata: &Metadata) -> String {
+    match modified_datetime(metadata) {
+        Some(modified) => {
+            format!("{}", modified.format("%Y-%m-%d %H:%M"))
+        }
+        _ => "".to_string(),
+    }
+}
+
+fn modified_datetime(metadata: &Metadata) -> Option<DateTime<Local>> {
+    match metadata.modified() {
+        Ok(modified) => {
+            let dur = modified.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            Some::<DateTime<Local>>(
+                chrono::DateTime::from_timestamp(dur.as_secs() as i64, 0)
+                    .unwrap()
+                    .into(),
+            )
+        }
+        _ => None, // No modified value
+    }
+}
+
+fn metadata_size_string(metadata: &Metadata) -> String {
+    // Not meant to be precise...
+    match NumberPrefix::decimal(metadata.len() as f64) {
+        NumberPrefix::Standalone(_) => "1 kB".into(),
+        NumberPrefix::Prefixed(prefix, n) => {
+            format!("{:.0} {}B", n, prefix.symbol())
+        }
+    }
+}

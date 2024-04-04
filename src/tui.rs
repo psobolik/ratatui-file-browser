@@ -21,6 +21,8 @@ use tokio_util::sync::CancellationToken;
 #[derive(Clone, Debug)]
 pub enum Event {
     Init,
+    SelectionChanged,
+    DirectoryChanged,
     // Quit,
     Error,
     // Closed,

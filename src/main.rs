@@ -15,6 +15,7 @@ async fn run() -> Result<()> {
     let mut tui = tui::Tui::new()?.tick_rate(1.0).frame_rate(30.0).mouse(true);
     tui.enter()?;
     let mut app = App::default();
+    app.set_event_tx(Some(tui.event_tx.clone()));
 
     loop {
         let event = tui.next().await?; // blocks until next event
