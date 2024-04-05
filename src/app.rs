@@ -84,10 +84,9 @@ impl App {
 
     async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
         match mouse_event.kind {
-            // This is to prevent mouse events we don't handle from clearing the error,
-            // (Especially Up and Moved.)
+            // If there's an error showing, any mouse event that we might handle will clear it
+            // instead.
             MouseEventKind::Down(..) | MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
-                // If there is an error showing, clear it and don't process the event.
                 if self.maybe_clear_error() {
                     return;
                 }
@@ -98,50 +97,62 @@ impl App {
 
         match mouse_event.kind {
             MouseEventKind::Down(mouse_button) => {
-                match mouse_button {
-                    MouseButton::Left => {
-                        if self.directory.hit_test(mouse_event.column, mouse_event.row) {
-                            if self.directory.has_focus()
-                                && self.directory.select_row(mouse_event.row)
-                            {
-                                self.load_selected_item().await;
-                            } else {
-                                self.focus_directory();
+                if mouse_button == MouseButton::Left {
+                    let directory_focused = self.directory.has_focus();
+                    if self.directory.hit_test(mouse_event.column, mouse_event.row) {
+                        if directory_focused {
+                            // A left click on the selected item in the focused directory pane is
+                            // converted into an Enter key event. A left click on an unselected item
+                            // selects it.
+                            if let Some(index) = self.directory.index_from_row(mouse_event.row) {
+                                if self.directory.is_selected(index) {
+                                    // self.fake_key(KeyCode::Enter, KeyModifiers::NONE).await;
+                                    let key_event =
+                                        KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+                                    self.handle_key_event(key_event).await;
+                                } else {
+                                    self.directory.set_selected(index);
+                                    self.load_selected_item().await;
+                                }
                             }
-                        } else if self.directory.has_focus()
-                            && self.preview.hit_test(mouse_event.column, mouse_event.row)
-                        {
-                            self.focus_preview();
+                        } else {
+                            self.focus_directory();
                         }
+                    } else if self.preview.hit_test(mouse_event.column, mouse_event.row)
+                        && directory_focused
+                    {
+                        self.focus_preview();
                     }
-                    // Right-click on the selected item in the directory will change the directory
-                    MouseButton::Right => {
-                        if self.directory.has_focus()
-                            && self
-                                .directory
-                                .is_selected(self.directory.index_from_row(mouse_event.row))
-                        {
-                            self.fake_key(KeyCode::Enter, KeyModifiers::NONE).await;
-                        }
-                    }
-                    _ => {}
                 }
             }
             MouseEventKind::ScrollUp => {
-                self.fake_key(KeyCode::Up, KeyModifiers::NONE).await;
+                let key_event = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+                self.handle_key_event_by_position(key_event, mouse_event.column, mouse_event.row)
+                    .await;
             }
             MouseEventKind::ScrollDown => {
-                self.fake_key(KeyCode::Down, KeyModifiers::NONE).await;
+                let key_event = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+                self.handle_key_event_by_position(key_event, mouse_event.column, mouse_event.row)
+                    .await;
             }
             _ => { /* ignore */ }
         }
     }
 
-    async fn fake_key(&mut self, key_code: KeyCode, modifiers: KeyModifiers) {
-        let key_event = KeyEvent::new(key_code, modifiers);
-        self.handle_key_event(key_event).await;
+    // Send a key event to the pane containing column/row
+    async fn handle_key_event_by_position(&mut self, key_event: KeyEvent, column: u16, row: u16) {
+        if self.directory.hit_test(column, row) {
+            if let Err(error) = self.directory.handle_key_event(key_event).await {
+                self.fs_error = Some(error);
+            }
+        } else if self.preview.hit_test(column, row) {
+            if let Err(error) = self.preview.handle_key_event(key_event).await {
+                self.fs_error = Some(error);
+            }
+        }
     }
 
+    // Handle a key event, or send it to the focused pane
     async fn handle_key_event(&mut self, key_event: KeyEvent) {
         // Ctrl+C closes the app, regardless of state
         if Char('c') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL {

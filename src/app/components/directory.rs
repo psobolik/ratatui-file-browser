@@ -148,17 +148,12 @@ impl Directory {
         }
     }
 
-    pub fn index_from_row(&self, row: u16) -> usize {
-        (row - self.area.y - 1) as usize + self.items.state.offset()
-    }
-
-    pub fn select_row(&mut self, row: u16) -> bool {
-        let row = self.index_from_row(row);
-        if row < self.items.len() {
-            self.set_selected(row);
-            true
+    pub fn index_from_row(&self, row: u16) -> Option<usize> {
+        let index = (row - self.area.y - 1) as usize + self.items.state.offset();
+        if (index >= self.items.lower_bound()) && (index <= self.items.upper_bound()) {
+            Some(index)
         } else {
-            false
+            None
         }
     }
 
@@ -192,7 +187,7 @@ impl Directory {
         Ok(false)
     }
 
-    fn set_selected(&mut self, selected: usize) -> bool {
+    pub fn set_selected(&mut self, selected: usize) -> bool {
         if Some(selected) == self.items.selected() {
             false
         } else {
@@ -230,5 +225,4 @@ impl Directory {
             .selected()
             .map(|selected| self.items[selected].clone())
     }
-
 }
