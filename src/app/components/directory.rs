@@ -3,17 +3,20 @@
  * Created 2024-03-17
  */
 
-use crate::app::components::Component;
-use crate::app::{components, styles};
-use crate::tui::Event;
-use crate::{constants, stateful_list::StatefulList, util};
+use std::path::PathBuf;
+
 use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent},
 };
 use ratatui::{layout::Rect, widgets::List, Frame};
-use std::path::PathBuf;
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::app::{components, styles};
+use crate::tui::Event;
+use crate::{constants, stateful_list::StatefulList, util};
+
+use super::Component;
 
 #[derive(Default)]
 pub struct Directory {
@@ -115,12 +118,7 @@ impl Component for Directory {
             item_count -= 1;
         }
         let item_count_string = format!("[{item_count} items]");
-        let block = if self.has_focus {
-            util::focused_block()
-        } else {
-            util::default_block()
-        }
-        .title(item_count_string);
+        let block = components::component_block(self.has_focus).title(item_count_string);
         let list = List::new(items)
             .block(block)
             .highlight_style(styles::LIST_HIGHLIGHT_STYLE);

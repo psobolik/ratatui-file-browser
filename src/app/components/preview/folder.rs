@@ -13,6 +13,7 @@ use ratatui::Frame;
 use crate::stateful_list::StatefulList;
 use crate::util;
 
+use super::components;
 use super::list_pane::ListPane;
 use super::preview_pane;
 use super::preview_pane::PreviewPane;
@@ -123,14 +124,8 @@ impl PreviewPane for Folder {
         self.set_area(area);
 
         if let Some(entry) = &self.entry {
-            let block = if has_focus {
-                util::focused_block()
-            } else {
-                util::default_block()
-            };
-            let metadata = entry.metadata()?;
-            let title = preview_pane::folder_title(&metadata, self.entry_list.len());
-            let block = block.title(title);
+            let title = preview_pane::folder_title(entry, self.entry_list.len())?;
+            let block = components::component_block(has_focus).title(title);
 
             let items = util::list_items(&self.entry_list, self.inner_area.height as usize);
             let list = List::new(items);

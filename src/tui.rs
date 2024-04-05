@@ -173,7 +173,6 @@ impl Tui {
     }
 
     pub fn exit(&mut self) -> Result<()> {
-        // self.stop()?;
         if crossterm::terminal::is_raw_mode_enabled()? {
             self.flush()?;
             if self.paste {
@@ -206,7 +205,6 @@ impl Tui {
 }
 
 impl Deref for Tui {
-    // type Target = ratatui::Terminal<Backend<std::io::Stderr>>;
     type Target = ratatui::Terminal<Backend<std::io::Stderr>>;
 
     fn deref(&self) -> &Self::Target {

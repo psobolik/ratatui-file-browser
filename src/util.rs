@@ -3,21 +3,16 @@
  * Created 2024-03-17
  */
 
-use crate::{constants, stateful_list::StatefulList};
+use std::path::{Path, PathBuf};
+
 use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent, KeyModifiers},
 };
 use ratatui::layout::Rect;
-use ratatui::{
-    prelude::{Color, Line, Modifier, Style},
-    widgets::{Block, BorderType, Borders, ListItem, Padding},
-};
-use std::path::{Path, PathBuf};
+use ratatui::{prelude::Line, widgets::ListItem};
 
-const FOCUSED_BLOCK_STYLE: Style = Style::new()
-    .fg(Color::LightBlue)
-    .add_modifier(Modifier::BOLD);
+use crate::{constants, stateful_list::StatefulList};
 
 pub fn clip_string(string: &String, width: usize) -> String {
     if string.len() > width {
@@ -85,19 +80,6 @@ fn path_icon(entry: &Path) -> char {
     }
 }
 
-pub fn focused_block<'a>() -> Block<'a> {
-    Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(FOCUSED_BLOCK_STYLE)
-        .padding(Padding::horizontal(1))
-}
-
-pub fn default_block<'a>() -> Block<'a> {
-    Block::default()
-        .borders(Borders::ALL)
-        .padding(Padding::horizontal(1))
-}
 pub fn is_up_key(key_event: KeyEvent) -> bool {
     key_event.code == KeyCode::Up
         || (Char('p') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
@@ -110,7 +92,6 @@ pub fn is_down_key(key_event: KeyEvent) -> bool {
 
 pub fn find_match_by_char<T>(
     list: &[T],
-    // list: Vec<T>,
     ch: char,
     selected: usize,
     match_char: fn(entry: &T) -> Option<char>,

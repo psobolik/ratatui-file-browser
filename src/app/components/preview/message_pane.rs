@@ -11,8 +11,7 @@ use ratatui::prelude::Style;
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::util;
-
+use super::components;
 use super::preview_pane;
 
 pub trait MessagePane {
@@ -29,14 +28,8 @@ pub trait MessagePane {
         frame: &mut Frame<'_>,
         area: Rect,
     ) -> Result<(), Error> {
-        let block = if has_focus {
-            util::focused_block()
-        } else {
-            util::default_block()
-        };
-        let metadata = entry.metadata()?;
-        let title = preview_pane::file_title(&metadata);
-        let block = block.title(title);
+        let title = preview_pane::file_title(entry)?;
+        let block = components::component_block(has_focus).title(title);
         frame.render_widget(block, area);
         frame.render_widget(
             Paragraph::new(message)

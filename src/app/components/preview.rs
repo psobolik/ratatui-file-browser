@@ -11,7 +11,6 @@ use ratatui::layout::Alignment;
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::{layout::Rect, Frame};
 
-use crate::app::components::Component;
 use binary::Binary;
 use folder::Folder;
 use list_pane::ListPane;
@@ -23,6 +22,8 @@ use text::Text;
 
 use crate::app::{components, styles};
 use crate::util;
+
+use super::Component;
 
 mod binary;
 mod folder;
@@ -217,11 +218,7 @@ impl Preview {
     }
 
     fn render_error(&self, message: &str, frame: &mut Frame<'_>) {
-        let block = if self.has_focus {
-            util::focused_block()
-        } else {
-            util::default_block()
-        };
+        let block = components::component_block(self.has_focus);
         frame.render_widget(block, self.area);
         frame.render_widget(
             Paragraph::new(ratatui::prelude::Text::from(message))

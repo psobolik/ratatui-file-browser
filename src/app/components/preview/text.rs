@@ -13,6 +13,7 @@ use ratatui::Frame;
 
 use crate::util;
 
+use super::components;
 use super::list_pane::ListPane;
 use super::preview_pane;
 use super::preview_pane::PreviewPane;
@@ -172,14 +173,8 @@ impl PreviewPane for Text {
         self.set_area(area);
 
         if let Some(entry) = &self.entry {
-            let block = if has_focus {
-                util::focused_block()
-            } else {
-                util::default_block()
-            };
-            let metadata = entry.metadata()?;
-            let title = preview_pane::file_title(&metadata);
-            let block = block.title(title);
+            let title = preview_pane::file_title(entry)?;
+            let block = components::component_block(has_focus).title(title);
 
             let items: Vec<Line> = self
                 .file_text

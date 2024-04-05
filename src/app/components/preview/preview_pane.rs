@@ -4,7 +4,7 @@
  */
 
 use std::fs::Metadata;
-use std::io::Error;
+use std::path::Path;
 use std::time::SystemTime;
 
 use chrono::{DateTime, Local};
@@ -13,7 +13,12 @@ use ratatui::layout::Rect;
 use ratatui::Frame;
 
 pub trait PreviewPane {
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, has_focus: bool) -> Result<(), Error>;
+    fn render(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        has_focus: bool,
+    ) -> Result<(), std::io::Error>;
 
     fn page_limit(total_size: usize, page_size: usize) -> usize {
         if total_size > page_size {
@@ -24,21 +29,23 @@ pub trait PreviewPane {
     }
 }
 
-pub fn file_title(metadata: &Metadata) -> String {
-    format!(
+pub fn file_title(entry: &Path) -> Result<String, std::io::Error> {
+    let metadata = &entry.metadata()?;
+    Ok(format!(
         "[{} - {}]",
         metadata_modified_string(metadata),
         metadata_size_string(metadata)
-    )
+    ))
 }
 
-pub fn folder_title(metadata: &Metadata, item_count: usize) -> String {
-    format!(
+pub fn folder_title(entry: &Path, item_count: usize) -> Result<String, std::io::Error> {
+    let metadata = &entry.metadata()?;
+    Ok(format!(
         "[{} - {} item{}]",
         metadata_modified_string(metadata),
         item_count,
         if item_count != 1 { "s" } else { "" },
-    )
+    ))
 }
 
 fn metadata_modified_string(metadata: &Metadata) -> String {

@@ -3,12 +3,15 @@
  * Created 2024-03-17
  */
 
-use crossterm::event::KeyEvent;
-use ratatui::layout::Rect;
-use ratatui::Frame;
 use std::cmp::Ordering;
 use std::io;
 use std::path::{Path, PathBuf};
+
+use crossterm::event::KeyEvent;
+use ratatui::layout::Rect;
+use ratatui::prelude::{Color, Modifier, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Padding};
+use ratatui::Frame;
 use tokio::fs;
 
 pub(crate) mod directory;
@@ -47,4 +50,29 @@ async fn read_directory(path: &Path) -> io::Result<Vec<PathBuf>> {
         }
     });
     Ok(paths.iter().map(|(_, path)| path.clone()).collect())
+}
+
+pub fn component_block<'a>(has_focus: bool) -> Block<'a> {
+    if has_focus {
+        focused_block()
+    } else {
+        default_block()
+    }
+}
+fn focused_block<'a>() -> Block<'a> {
+    const FOCUSED_BLOCK_STYLE: Style = Style::new()
+        .fg(Color::LightBlue)
+        .add_modifier(Modifier::BOLD);
+
+    Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(FOCUSED_BLOCK_STYLE)
+        .padding(Padding::horizontal(1))
+}
+
+fn default_block<'a>() -> Block<'a> {
+    Block::default()
+        .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
 }
