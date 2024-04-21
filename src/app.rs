@@ -31,7 +31,6 @@ struct FrameSet {
 pub struct App {
     pub should_quit: bool,
     fs_error: Option<io::Error>,
-    event_tx: Option<UnboundedSender<Event>>,
     // Components
     head: Head,
     directory: Directory,
@@ -40,7 +39,6 @@ pub struct App {
 
 impl App {
     pub fn set_event_tx(&mut self, event_tx: Option<UnboundedSender<Event>>) {
-        self.event_tx = event_tx.clone();
         self.directory.set_event_tx(event_tx);
     }
 
@@ -72,10 +70,17 @@ impl App {
         self.preview.handle_resize_event(frame_set.preview);
     }
 
-    fn maybe_clear_error(&mut self) -> bool {
-        // If there's an error pending, clear it.
+    async fn maybe_clear_error(&mut self) -> bool {
         if self.fs_error.is_some() {
+            // If there's an error pending, clear it.
             self.fs_error = None;
+            // If the current item is not valid anymore, reload the current folder and selected item
+            if let Some(path) = self.directory.selected_item() {
+                if path.metadata().is_err() {
+                    self.directory.load_cwd().await.unwrap();
+                    self.load_selected_item().await;
+                }
+            }
             true
         } else {
             false
@@ -87,7 +92,7 @@ impl App {
             // If there's an error showing, any mouse event that we might handle will clear it
             // instead.
             MouseEventKind::Down(..) | MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
-                if self.maybe_clear_error() {
+                if self.maybe_clear_error().await {
                     return;
                 }
             }
@@ -160,7 +165,7 @@ impl App {
             return;
         }
         // If there is an error showing, clear it and don't process the event.
-        if self.maybe_clear_error() {
+        if self.maybe_clear_error().await {
             return;
         }
         match key_event.code {
