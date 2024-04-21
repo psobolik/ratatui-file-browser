@@ -11,7 +11,7 @@ pub struct StatefulList<T> {
 }
 
 #[allow(dead_code)]
-impl<T> StatefulList<T> {
+impl<T> StatefulList<T> where T: PartialEq + std::fmt::Debug {
     pub fn with_items(items: Vec<T>) -> StatefulList<T> {
         StatefulList {
             state: ListState::default(),
@@ -159,6 +159,16 @@ impl<T> StatefulList<T> {
     pub fn unselect(&mut self) {
         self.set_selected(None);
     }
+
+    pub fn index_of(&self, needle: &T) -> Option<usize> {
+        for (index, item) in self.items.iter().enumerate() {
+            if item == needle {
+                return Some(index);
+            }
+        }
+        None
+    }
+    
 }
 
 impl<T> std::ops::Index<usize> for StatefulList<T> {

@@ -6,15 +6,15 @@
 use std::path::PathBuf;
 
 use crossterm::{
-    event::KeyCode::Char,
     event::{KeyCode, KeyEvent},
+    event::KeyCode::Char,
 };
-use ratatui::{layout::Rect, widgets::List, Frame};
+use ratatui::{Frame, layout::Rect, widgets::List};
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::{constants, stateful_list::StatefulList, util};
 use crate::app::{components, styles};
 use crate::tui::Event;
-use crate::{constants, stateful_list::StatefulList, util};
 
 use super::Component;
 
@@ -54,6 +54,7 @@ impl Component for Directory {
         }
         let mut selection_changed = false;
         let mut directory_changed = false;
+        let current = self.get_cwd();
 
         if util::is_up_key(key_event) {
             // Move selection up one entry
@@ -97,6 +98,11 @@ impl Component for Directory {
         }
         if directory_changed {
             self.load_cwd().await?;
+            if let Ok(current) = current {
+                if let Some(selected) = self.items.index_of(&current) {
+                    self.set_selected(selected);
+                }
+            }
         }
         if selection_changed {
             self.event_tx
@@ -147,9 +153,9 @@ impl Directory {
     }
 
     pub fn index_from_row(&self, row: u16) -> Option<usize> {
-        let index = (row - self.area.y - 1) as usize + self.items.state.offset();
-        if (index >= self.items.lower_bound()) && (index <= self.items.upper_bound()) {
-            Some(index)
+        let index = (row - self.area.y) as usize + self.items.state.offset();
+        if (index > self.items.lower_bound()) && (index <= self.items.len()) {
+            Some(index - 1)
         } else {
             None
         }
@@ -183,7 +189,7 @@ impl Directory {
             if let Ok(cd) = std::env::current_dir() {
                 cwd = Some(cd);
             } else {
-                std::env::set_current_dir("..")?
+                std::env::set_current_dir(constants::PARENT_DIRECTORY)?
             }
         }
         if let Some(cwd) = cwd {
@@ -202,7 +208,7 @@ impl Directory {
         }
         Ok(false)
     }
-
+    
     pub fn set_selected(&mut self, selected: usize) -> bool {
         if Some(selected) == self.items.selected() {
             false
