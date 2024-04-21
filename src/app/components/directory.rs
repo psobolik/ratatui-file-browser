@@ -156,7 +156,7 @@ impl Directory {
     }
 
     pub async fn load_cwd(&mut self) -> Result<(), std::io::Error> {
-        let cwd = std::env::current_dir()?;
+        let cwd = self.get_cwd()?;
         let entries = components::read_directory(&cwd).await?;
         let mut result = vec![];
         // Prepend parent directory entry if there is one
@@ -173,6 +173,24 @@ impl Directory {
             .send(Event::DirectoryChanged)
             .expect("Panic sending directory changed event");
         Ok(())
+    }
+    
+    fn get_cwd(&self) -> Result<PathBuf, std::io::Error> {
+        // Gets the current directory, unless it doesn't exist (because it was deleted?)
+        // Then gets the current directory's first valid parent instead.
+        let mut cwd: Option<PathBuf> = None;
+        while cwd.is_none() {
+            if let Ok(cd) = std::env::current_dir() {
+                cwd = Some(cd);
+            } else {
+                std::env::set_current_dir("..")?
+            }
+        }
+        if let Some(cwd) = cwd {
+            Ok(cwd)
+        } else {
+            Err(std::io::Error::new(std::io::ErrorKind::Other, "Can't find valid directory"))            
+        }
     }
 
     fn cd(&mut self) -> Result<bool, std::io::Error> {
