@@ -24,7 +24,7 @@ pub(crate) trait Component {
     fn hit_test(&self, x: u16, y: u16) -> bool;
     fn handle_resize_event(&mut self, area: Rect);
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error>;
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<(), std::io::Error>;
+    fn render(&mut self, frame: &mut Frame<'_>) -> Result<(), std::io::Error>;
 }
 
 async fn read_file(path: &Path) -> io::Result<Vec<String>> {

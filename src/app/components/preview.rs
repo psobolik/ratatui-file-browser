@@ -95,9 +95,7 @@ impl Component for Preview {
         Ok(())
     }
 
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<(), std::io::Error> {
-        self.area = area;
-
+    fn render(&mut self, frame: &mut Frame<'_>) -> Result<(), std::io::Error> {
         if let Some(file_contents) = &self.preview_type {
             match file_contents {
                 PreviewType::Folder => {

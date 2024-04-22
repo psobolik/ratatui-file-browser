@@ -31,6 +31,8 @@ struct FrameSet {
 pub struct App {
     pub should_quit: bool,
     fs_error: Option<io::Error>,
+    area: Rect,
+
     // Components
     head: Head,
     directory: Directory,
@@ -56,7 +58,7 @@ impl App {
 
     async fn handle_init_event(&mut self, width: u16, height: u16) {
         self.handle_resize_event(width, height);
-        
+
         if let Err(error) = self.directory.load_cwd().await {
             self.fs_error = Some(error);
         }
@@ -66,7 +68,8 @@ impl App {
     }
 
     fn handle_resize_event(&mut self, width: u16, height: u16) {
-        let frame_set = Self::calculate_frames(Rect::new(0, 0, width, height));
+        self.area = Rect::new(0, 0, width, height);
+        let frame_set = Self::calculate_frames(self.area);
         self.head.handle_resize_event(frame_set.head);
         self.directory.handle_resize_event(frame_set.directory);
         self.preview.handle_resize_event(frame_set.preview);
@@ -113,7 +116,6 @@ impl App {
                             // selects it.
                             if let Some(index) = self.directory.index_from_row(mouse_event.row) {
                                 if self.directory.is_selected(index) {
-                                    // self.fake_key(KeyCode::Enter, KeyModifiers::NONE).await;
                                     let key_event =
                                         KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
                                     self.handle_key_event(key_event).await;
@@ -230,19 +232,15 @@ impl App {
     }
 
     pub fn render(&mut self, frame: &mut Frame<'_>) {
-        let frame_rect = frame.size();
-
-        let frame_set = Self::calculate_frames(frame_rect);
-
-        self.head.render(frame, frame_set.head);
-        if let Err(error) = self.directory.render(frame, frame_set.directory) {
+        self.head.render(frame);
+        if let Err(error) = self.directory.render(frame) {
             self.fs_error = Some(error);
         }
-        if let Err(error) = self.preview.render(frame, frame_set.preview) {
+        if let Err(error) = self.preview.render(frame) {
             self.fs_error = Some(error);
         }
         if let Some(fs_error) = &self.fs_error {
-            self.render_error_popup(&fs_error.to_string(), frame, frame_rect);
+            self.render_error_popup(&fs_error.to_string(), frame, self.area);
         }
     }
 

@@ -114,9 +114,7 @@ impl Component for Directory {
         Ok(())
     }
 
-    fn render(&mut self, frame: &mut Frame, area: Rect) -> Result<(), std::io::Error> {
-        self.area = area;
-
+    fn render(&mut self, frame: &mut Frame) -> Result<(), std::io::Error> {
         let items = util::list_items(&self.items, frame.size().height as usize);
         // Don't include parent directory in count
         let mut item_count = self.items.len();
@@ -128,7 +126,7 @@ impl Component for Directory {
         let list = List::new(items)
             .block(block)
             .highlight_style(styles::LIST_HIGHLIGHT_STYLE);
-        frame.render_stateful_widget(list, area, &mut self.items.state);
+        frame.render_stateful_widget(list, self.area, &mut self.items.state);
 
         Ok(())
     }
