@@ -20,7 +20,7 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Clone, Debug)]
 pub enum Event {
-    Init,
+    Init(u16, u16),
     SelectionChanged,
     DirectoryChanged,
     // Quit,
@@ -104,7 +104,8 @@ impl Tui {
             let mut reader = crossterm::event::EventStream::new();
             let mut tick_interval = tokio::time::interval(tick_delay);
             let mut render_interval = tokio::time::interval(render_delay);
-            _event_tx.send(Event::Init).unwrap();
+            let (columns, rows) = crossterm::terminal::size().unwrap();
+            _event_tx.send(Event::Init(columns, rows)).unwrap();
 
             loop {
                 let tick_delay = tick_interval.tick();

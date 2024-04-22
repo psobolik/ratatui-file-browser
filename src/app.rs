@@ -45,7 +45,7 @@ impl App {
     pub async fn handle_event(&mut self, event: Event) {
         match event {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
-            Event::Init => self.handle_init_event().await,
+            Event::Init(width, height) => self.handle_init_event(width, height).await,
             Event::Resize(width, height) => self.handle_resize_event(width, height),
             Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event).await,
             Event::SelectionChanged => self.load_selected_item().await,
@@ -54,7 +54,9 @@ impl App {
         }
     }
 
-    async fn handle_init_event(&mut self) {
+    async fn handle_init_event(&mut self, width: u16, height: u16) {
+        self.handle_resize_event(width, height);
+        
         if let Err(error) = self.directory.load_cwd().await {
             self.fs_error = Some(error);
         }
