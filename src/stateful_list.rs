@@ -11,7 +11,10 @@ pub struct StatefulList<T> {
 }
 
 #[allow(dead_code)]
-impl<T> StatefulList<T> where T: PartialEq + std::fmt::Debug {
+impl<T> StatefulList<T>
+where
+    T: PartialEq + std::fmt::Debug,
+{
     pub fn with_items(items: Vec<T>) -> StatefulList<T> {
         StatefulList {
             state: ListState::default(),
@@ -168,7 +171,6 @@ impl<T> StatefulList<T> where T: PartialEq + std::fmt::Debug {
         }
         None
     }
-    
 }
 
 impl<T> std::ops::Index<usize> for StatefulList<T> {

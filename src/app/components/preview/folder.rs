@@ -38,11 +38,6 @@ impl ListPane<PathBuf> for Folder {
         self.set_scrollbar_state();
     }
 
-    fn handle_resize_event(&mut self, rect: Rect) {
-        self.set_area(rect);
-        self.set_scrollbar_state();
-    }
-
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         if util::is_up_key(key_event) {
             // Scroll up one line
@@ -115,14 +110,7 @@ impl ListPane<PathBuf> for Folder {
 }
 
 impl PreviewPane for Folder {
-    fn render(
-        &mut self,
-        frame: &mut Frame<'_>,
-        area: Rect,
-        has_focus: bool,
-    ) -> Result<(), std::io::Error> {
-        self.set_area(area);
-
+    fn render(&mut self, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), std::io::Error> {
         if let Some(entry) = &self.entry {
             let title = preview_pane::folder_title(entry, self.entry_list.len())?;
             let block = components::component_block(has_focus).title(title);
@@ -144,6 +132,10 @@ impl PreviewPane for Folder {
         }
         Ok(())
     }
+    fn handle_resize_event(&mut self, rect: Rect) {
+        self.set_area(rect);
+        self.set_scrollbar_state();
+    }
 }
 
 impl Folder {
@@ -157,14 +149,13 @@ impl Folder {
 
     fn set_scrollbar_state(&mut self) {
         let height = self.inner_area.height as usize;
-        let len = self.entry_list.upper_bound() + 1;
-        if len > height {
-            self.scrollbar_state = ScrollbarState::new(len)
-                .position(0)
-                .viewport_content_length(height);
+        let len = if self.entry_list.len() <= height {
+            0
         } else {
-            // Hide unneeded scrollbar
-            self.scrollbar_state = ScrollbarState::default();
-        }
+            self.entry_list.len()
+        };
+        self.scrollbar_state = ScrollbarState::new(len)
+            .position(0)
+            .viewport_content_length(height);
     }
 }

@@ -77,11 +77,11 @@ impl Component for Preview {
     fn handle_resize_event(&mut self, area: Rect) {
         self.area = area;
 
-        match self.preview_type {
-            Some(PreviewType::TextFile) => self.text_pane.handle_resize_event(area),
-            Some(PreviewType::Folder) => self.folder_pane.handle_resize_event(area),
-            _ => {}
-        }
+        self.binary_pane.handle_resize_event(area);
+        self.other_pane.handle_resize_event(area);
+        self.oversize_pane.handle_resize_event(area);
+        self.text_pane.handle_resize_event(area);
+        self.folder_pane.handle_resize_event(area);
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
@@ -101,19 +101,19 @@ impl Component for Preview {
         if let Some(file_contents) = &self.preview_type {
             match file_contents {
                 PreviewType::Folder => {
-                    self.folder_pane.render(frame, area, self.has_focus)?;
+                    self.folder_pane.render(frame, self.has_focus)?;
                 }
                 PreviewType::TextFile => {
-                    self.text_pane.render(frame, area, self.has_focus)?;
+                    self.text_pane.render(frame, self.has_focus)?;
                 }
                 PreviewType::OversizeTextFile => {
-                    self.oversize_pane.render(frame, area, self.has_focus())?;
+                    self.oversize_pane.render(frame, self.has_focus())?;
                 }
                 PreviewType::BinaryFile => {
-                    self.binary_pane.render(frame, area, self.has_focus)?;
+                    self.binary_pane.render(frame, self.has_focus)?;
                 }
                 PreviewType::OtherFile => {
-                    self.other_pane.render(frame, area, self.has_focus())?;
+                    self.other_pane.render(frame, self.has_focus())?;
                 }
                 PreviewType::Error(message) => {
                     self.render_error(message, frame);

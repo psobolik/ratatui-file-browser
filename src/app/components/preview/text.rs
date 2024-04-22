@@ -49,13 +49,6 @@ impl ListPane<String> for Text {
         self.set_vertical_scrollbar_state();
     }
 
-    fn handle_resize_event(&mut self, rect: Rect) {
-        self.set_area(rect);
-
-        self.set_horizontal_scrollbar_state();
-        self.set_vertical_scrollbar_state();
-    }
-
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         if util::is_up_key(key_event) {
             if self.can_scroll_vertically() && self.file_vertical_offset > 0 {
@@ -164,14 +157,7 @@ impl ListPane<String> for Text {
 }
 
 impl PreviewPane for Text {
-    fn render(
-        &mut self,
-        frame: &mut Frame<'_>,
-        area: Rect,
-        has_focus: bool,
-    ) -> Result<(), std::io::Error> {
-        self.set_area(area);
-
+    fn render(&mut self, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), std::io::Error> {
         if let Some(entry) = &self.entry {
             let title = preview_pane::file_title(entry)?;
             let block = components::component_block(has_focus).title(title);
@@ -212,6 +198,12 @@ impl PreviewPane for Text {
         }
         Ok(())
     }
+    fn handle_resize_event(&mut self, rect: Rect) {
+        self.set_area(rect);
+
+        self.set_horizontal_scrollbar_state();
+        self.set_vertical_scrollbar_state();
+    }
 }
 impl Text {
     fn can_scroll_horizontally(&self) -> bool {
@@ -231,29 +223,27 @@ impl Text {
     }
 
     fn set_horizontal_scrollbar_state(&mut self) {
-        let line_width = self.widest_line_len;
         let frame_width = self.inner_area.width as usize;
-        if line_width > self.inner_area.width as usize {
-            self.file_horizontal_scrollbar_state = ScrollbarState::new(line_width)
-                .position(0)
-                .viewport_content_length(frame_width);
+        let line_width = if self.widest_line_len <= frame_width {
+            0
         } else {
-            // Hide unneeded scrollbar
-            self.file_horizontal_scrollbar_state = ScrollbarState::default();
+            self.widest_line_len
         };
+        self.file_horizontal_scrollbar_state = ScrollbarState::new(line_width)
+            .position(0)
+            .viewport_content_length(frame_width);
     }
 
     fn set_vertical_scrollbar_state(&mut self) {
         let height = self.inner_area.height as usize;
-        let len = self.file_text.len();
-        if len > height {
-            self.file_vertical_scrollbar_state = ScrollbarState::new(len)
-                .position(0)
-                .viewport_content_length(height);
+        let len = if self.file_text.len() <= height {
+            0
         } else {
-            // Hide unneeded scrollbar
-            self.file_vertical_scrollbar_state = ScrollbarState::default();
-        }
+            self.file_text.len()
+        };
+        self.file_vertical_scrollbar_state = ScrollbarState::new(len)
+            .position(0)
+            .viewport_content_length(height);
     }
 
     fn widest_line_length(lines: &[String]) -> usize {

@@ -15,8 +15,6 @@ pub trait ListPane<T> {
         self.init(None, vec![])
     }
 
-    fn handle_resize_event(&mut self, area: Rect);
-
     fn handle_key_event(&mut self, key_event: KeyEvent);
 
     fn set_area(&mut self, area: Rect);

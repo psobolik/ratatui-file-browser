@@ -6,15 +6,15 @@
 use std::path::PathBuf;
 
 use crossterm::{
-    event::{KeyCode, KeyEvent},
     event::KeyCode::Char,
+    event::{KeyCode, KeyEvent},
 };
-use ratatui::{Frame, layout::Rect, widgets::List};
+use ratatui::{layout::Rect, widgets::List, Frame};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{constants, stateful_list::StatefulList, util};
 use crate::app::{components, styles};
 use crate::tui::Event;
+use crate::{constants, stateful_list::StatefulList, util};
 
 use super::Component;
 
@@ -180,7 +180,7 @@ impl Directory {
             .expect("Panic sending directory changed event");
         Ok(())
     }
-    
+
     fn get_cwd(&self) -> Result<PathBuf, std::io::Error> {
         // Gets the current directory, unless it doesn't exist (because it was deleted?)
         // Then gets the current directory's first valid parent instead.
@@ -195,7 +195,10 @@ impl Directory {
         if let Some(cwd) = cwd {
             Ok(cwd)
         } else {
-            Err(std::io::Error::new(std::io::ErrorKind::Other, "Can't find valid directory"))            
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Can't find valid directory",
+            ))
         }
     }
 
@@ -208,7 +211,7 @@ impl Directory {
         }
         Ok(false)
     }
-    
+
     pub fn set_selected(&mut self, selected: usize) -> bool {
         if Some(selected) == self.items.selected() {
             false
