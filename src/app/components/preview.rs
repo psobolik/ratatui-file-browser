@@ -62,6 +62,10 @@ pub struct Preview {
 }
 
 impl Component for Preview {
+    fn set_area(&mut self, area: Rect) {
+        self.area = area;
+    }
+    
     fn has_focus(&self) -> bool {
         self.has_focus
     }
@@ -72,16 +76,6 @@ impl Component for Preview {
 
     fn hit_test(&self, x: u16, y: u16) -> bool {
         util::is_in_rect(x, y, self.area)
-    }
-
-    fn handle_resize_event(&mut self, area: Rect) {
-        self.area = area;
-
-        self.binary_pane.handle_resize_event(area);
-        self.other_pane.handle_resize_event(area);
-        self.oversize_pane.handle_resize_event(area);
-        self.text_pane.handle_resize_event(area);
-        self.folder_pane.handle_resize_event(area);
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
@@ -95,23 +89,26 @@ impl Component for Preview {
         Ok(())
     }
 
-    fn render(&mut self, frame: &mut Frame<'_>) -> Result<(), std::io::Error> {
+    fn render(&mut self, area: Rect, frame: &mut Frame<'_>) -> Result<(), std::io::Error> {
+        self.set_area(area);
+
         if let Some(file_contents) = &self.preview_type {
             match file_contents {
                 PreviewType::Folder => {
-                    self.folder_pane.render(frame, self.has_focus)?;
+                    self.folder_pane.render(self.area, frame, self.has_focus)?;
                 }
                 PreviewType::TextFile => {
-                    self.text_pane.render(frame, self.has_focus)?;
+                    self.text_pane.render(self.area, frame, self.has_focus)?;
                 }
                 PreviewType::OversizeTextFile => {
-                    self.oversize_pane.render(frame, self.has_focus())?;
+                    self.oversize_pane
+                        .render(self.area, frame, self.has_focus())?;
                 }
                 PreviewType::BinaryFile => {
-                    self.binary_pane.render(frame, self.has_focus)?;
+                    self.binary_pane.render(self.area, frame, self.has_focus)?;
                 }
                 PreviewType::OtherFile => {
-                    self.other_pane.render(frame, self.has_focus())?;
+                    self.other_pane.render(self.area, frame, self.has_focus())?;
                 }
                 PreviewType::Error(message) => {
                     self.render_error(message, frame);
@@ -143,14 +140,16 @@ impl Preview {
     pub fn set_folder_items(&mut self, entry: &Path, items: Vec<PathBuf>) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.folder_pane.init(Some(&entry.to_path_buf()), items);
+        self.folder_pane
+            .init(Some(&entry.to_path_buf()), items, self.area);
         self.preview_type = Some(PreviewType::Folder);
     }
 
     pub fn set_text_file(&mut self, entry: &Path, lines: Vec<String>) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.text_pane.init(Some(&entry.to_path_buf()), lines);
+        self.text_pane
+            .init(Some(&entry.to_path_buf()), lines, self.area);
         self.preview_type = Some(PreviewType::TextFile);
     }
 

@@ -4,7 +4,6 @@
  */
 
 use std::cmp::Ordering;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use crossterm::event::KeyEvent;
@@ -19,20 +18,20 @@ pub(crate) mod head;
 pub(crate) mod preview;
 
 pub(crate) trait Component {
+    fn set_area(&mut self, area: Rect);
     fn has_focus(&self) -> bool;
     fn set_focus(&mut self, focus: bool);
     fn hit_test(&self, x: u16, y: u16) -> bool;
-    fn handle_resize_event(&mut self, area: Rect);
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error>;
-    fn render(&mut self, frame: &mut Frame<'_>) -> Result<(), std::io::Error>;
+    fn render(&mut self, area: Rect, frame: &mut Frame<'_>) -> Result<(), std::io::Error>;
 }
 
-async fn read_file(path: &Path) -> io::Result<Vec<String>> {
+async fn read_file(path: &Path) -> std::io::Result<Vec<String>> {
     let contents = fs::read_to_string(path).await?;
     Ok(contents.lines().map(|f| f.to_string()).collect())
 }
 
-async fn read_directory(path: &Path) -> io::Result<Vec<PathBuf>> {
+async fn read_directory(path: &Path) -> std::io::Result<Vec<PathBuf>> {
     let mut paths: Vec<(bool, PathBuf)> = vec![];
     let mut entries = fs::read_dir(&path).await?;
     while let Some(dir_entry) = entries.next_entry().await? {

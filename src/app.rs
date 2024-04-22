@@ -31,8 +31,7 @@ struct FrameSet {
 pub struct App {
     pub should_quit: bool,
     fs_error: Option<io::Error>,
-    area: Rect,
-
+ 
     // Components
     head: Head,
     directory: Directory,
@@ -48,7 +47,6 @@ impl App {
         match event {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
             Event::Init(width, height) => self.handle_init_event(width, height).await,
-            Event::Resize(width, height) => self.handle_resize_event(width, height),
             Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event).await,
             Event::SelectionChanged => self.load_selected_item().await,
             Event::DirectoryChanged => self.handle_directory_changed(),
@@ -57,22 +55,18 @@ impl App {
     }
 
     async fn handle_init_event(&mut self, width: u16, height: u16) {
-        self.handle_resize_event(width, height);
+        let area = Rect::new(0, 0, width, height);
+        let frame_set = Self::calculate_frames(area);
 
+        self.directory.set_area(frame_set.directory);
+        self.preview.set_area(frame_set.preview);
+        
         if let Err(error) = self.directory.load_cwd().await {
             self.fs_error = Some(error);
         }
         self.load_selected_item().await;
         self.directory.set_focus(true);
         self.preview.set_focus(false);
-    }
-
-    fn handle_resize_event(&mut self, width: u16, height: u16) {
-        self.area = Rect::new(0, 0, width, height);
-        let frame_set = Self::calculate_frames(self.area);
-        self.head.handle_resize_event(frame_set.head);
-        self.directory.handle_resize_event(frame_set.directory);
-        self.preview.handle_resize_event(frame_set.preview);
     }
 
     async fn maybe_clear_error(&mut self) -> bool {
@@ -232,15 +226,18 @@ impl App {
     }
 
     pub fn render(&mut self, frame: &mut Frame<'_>) {
-        self.head.render(frame);
-        if let Err(error) = self.directory.render(frame) {
+        let area = frame.size();
+        let frame_set = Self::calculate_frames(area);
+
+        self.head.render(frame_set.head, frame);
+        if let Err(error) = self.directory.render(frame_set.directory, frame) {
             self.fs_error = Some(error);
         }
-        if let Err(error) = self.preview.render(frame) {
+        if let Err(error) = self.preview.render(frame_set.preview, frame) {
             self.fs_error = Some(error);
         }
         if let Some(fs_error) = &self.fs_error {
-            self.render_error_popup(&fs_error.to_string(), frame, self.area);
+            self.render_error_popup(&fs_error.to_string(), frame, area);
         }
     }
 

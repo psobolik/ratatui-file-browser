@@ -10,7 +10,6 @@ use std::path::PathBuf;
 #[derive(Default)]
 pub struct Head {
     path: Option<PathBuf>,
-    area: Rect,
 }
 
 impl Head {
@@ -18,11 +17,7 @@ impl Head {
         self.path = path;
     }
 
-    pub fn handle_resize_event(&mut self, rect: Rect) {
-        self.area = rect;
-    }
-
-    pub fn render(&mut self, frame: &mut Frame) {
+    pub fn render(&mut self, area: Rect, frame: &mut Frame) {
         let text = if let Some(path) = &self.path {
             util::entry_path(path.as_path())
         } else {
@@ -30,8 +25,8 @@ impl Head {
         };
         let text = format!("[{text}]");
         frame.render_widget(
-            Paragraph::new(util::clip_string(&text, self.area.width as usize)),
-            self.area,
+            Paragraph::new(util::clip_string(&text, area.width as usize)),
+            area,
         );
     }
 }

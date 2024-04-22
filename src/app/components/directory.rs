@@ -27,6 +27,10 @@ pub struct Directory {
 }
 
 impl Component for Directory {
+    fn set_area(&mut self, area: Rect) {
+        self.area = area;
+    }
+    
     fn has_focus(&self) -> bool {
         self.has_focus
     }
@@ -37,10 +41,6 @@ impl Component for Directory {
 
     fn hit_test(&self, x: u16, y: u16) -> bool {
         util::is_in_rect(x, y, self.area)
-    }
-
-    fn handle_resize_event(&mut self, area: Rect) {
-        self.area = area;
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
@@ -114,7 +114,9 @@ impl Component for Directory {
         Ok(())
     }
 
-    fn render(&mut self, frame: &mut Frame) -> Result<(), std::io::Error> {
+    fn render(&mut self, area: Rect, frame: &mut Frame) -> Result<(), std::io::Error> {
+        self.set_area(area);
+
         let items = util::list_items(&self.items, frame.size().height as usize);
         // Don't include parent directory in count
         let mut item_count = self.items.len();

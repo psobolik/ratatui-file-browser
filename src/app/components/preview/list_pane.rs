@@ -9,11 +9,9 @@ use crossterm::event::KeyEvent;
 use ratatui::layout::Rect;
 
 pub trait ListPane<T> {
-    fn init(&mut self, entry: Option<&PathBuf>, items: Vec<T>);
+    fn init(&mut self, entry: Option<&PathBuf>, items: Vec<T>, area: Rect);
 
-    fn clear(&mut self) {
-        self.init(None, vec![])
-    }
+    fn clear(&mut self);
 
     fn handle_key_event(&mut self, key_event: KeyEvent);
 

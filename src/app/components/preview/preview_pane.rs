@@ -13,9 +13,12 @@ use ratatui::layout::Rect;
 use ratatui::Frame;
 
 pub trait PreviewPane {
-    fn render(&mut self, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), std::io::Error>;
-
-    fn handle_resize_event(&mut self, rect: Rect);
+    fn render(
+        &mut self,
+        area: Rect,
+        frame: &mut Frame<'_>,
+        has_focus: bool,
+    ) -> Result<(), std::io::Error>;
 
     fn page_limit(total_size: usize, page_size: usize) -> usize {
         if total_size > page_size {

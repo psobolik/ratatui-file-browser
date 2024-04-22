@@ -18,7 +18,6 @@ use super::preview_pane::PreviewPane;
 pub(super) struct Oversize {
     // The file's directory entry
     entry: Option<PathBuf>,
-    area: Rect,
 }
 
 impl MessagePane for Oversize {
@@ -28,7 +27,7 @@ impl MessagePane for Oversize {
 }
 
 impl PreviewPane for Oversize {
-    fn render(&mut self, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), Error> {
+    fn render(&mut self, area: Rect, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), Error> {
         if let Some(entry) = &self.entry {
             <Self as MessagePane>::render_message(
                 entry,
@@ -36,13 +35,9 @@ impl PreviewPane for Oversize {
                 has_focus,
                 styles::OVERSIZE_FILE_STYLE,
                 frame,
-                self.area,
+                area,
             )?;
         }
         Ok(())
-    }
-
-    fn handle_resize_event(&mut self, rect: Rect) {
-        self.area = rect;
     }
 }

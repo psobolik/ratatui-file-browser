@@ -32,9 +32,19 @@ pub(super) struct Folder {
 }
 
 impl ListPane<PathBuf> for Folder {
-    fn init(&mut self, entry: Option<&PathBuf>, items: Vec<PathBuf>) {
+    fn init(&mut self, entry: Option<&PathBuf>, items: Vec<PathBuf>, area: Rect) {
+        self.set_area(area);
+
         self.entry = entry.cloned();
         self.entry_list = StatefulList::with_items(items);
+
+        self.set_scrollbar_state();
+    }
+
+    fn clear(&mut self) {
+        self.entry = None;
+        self.entry_list = StatefulList::with_items(vec![]);
+
         self.set_scrollbar_state();
     }
 
@@ -110,7 +120,14 @@ impl ListPane<PathBuf> for Folder {
 }
 
 impl PreviewPane for Folder {
-    fn render(&mut self, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), std::io::Error> {
+    fn render(
+        &mut self,
+        area: Rect,
+        frame: &mut Frame<'_>,
+        has_focus: bool,
+    ) -> Result<(), std::io::Error> {
+        self.set_area(area);
+
         if let Some(entry) = &self.entry {
             let title = preview_pane::folder_title(entry, self.entry_list.len())?;
             let block = components::component_block(has_focus).title(title);
@@ -131,10 +148,6 @@ impl PreviewPane for Folder {
             );
         }
         Ok(())
-    }
-    fn handle_resize_event(&mut self, rect: Rect) {
-        self.set_area(rect);
-        self.set_scrollbar_state();
     }
 }
 

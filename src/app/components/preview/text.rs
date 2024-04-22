@@ -37,15 +37,22 @@ pub(super) struct Text {
 }
 
 impl ListPane<String> for Text {
-    fn init(&mut self, entry: Option<&PathBuf>, lines: Vec<String>) {
+    fn init(&mut self, entry: Option<&PathBuf>, lines: Vec<String>, area: Rect) {
+        self.set_area(area);
+
         self.entry = entry.cloned();
         self.widest_line_len = Self::widest_line_length(&lines);
         self.file_text = lines;
 
-        self.file_horizontal_offset = 0;
         self.set_horizontal_scrollbar_state();
+        self.set_vertical_scrollbar_state();
+    }
 
-        self.file_vertical_offset = 0;
+    fn clear(&mut self) {
+        self.entry = None;
+        self.file_text = vec![];
+
+        self.set_horizontal_scrollbar_state();
         self.set_vertical_scrollbar_state();
     }
 
@@ -157,7 +164,14 @@ impl ListPane<String> for Text {
 }
 
 impl PreviewPane for Text {
-    fn render(&mut self, frame: &mut Frame<'_>, has_focus: bool) -> Result<(), std::io::Error> {
+    fn render(
+        &mut self,
+        area: Rect,
+        frame: &mut Frame<'_>,
+        has_focus: bool,
+    ) -> Result<(), std::io::Error> {
+        self.set_area(area);
+
         if let Some(entry) = &self.entry {
             let title = preview_pane::file_title(entry)?;
             let block = components::component_block(has_focus).title(title);
@@ -197,12 +211,6 @@ impl PreviewPane for Text {
             );
         }
         Ok(())
-    }
-    fn handle_resize_event(&mut self, rect: Rect) {
-        self.set_area(rect);
-
-        self.set_horizontal_scrollbar_state();
-        self.set_vertical_scrollbar_state();
     }
 }
 impl Text {
