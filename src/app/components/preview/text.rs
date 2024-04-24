@@ -293,27 +293,27 @@ impl<'a> Text<'a> {
     }
 
     fn set_horizontal_scrollbar_state(&mut self) {
-        let frame_width = self.inner_area.width as usize;
-        let line_width = if self.widest_line_len <= frame_width {
+        let frame_length = self.inner_area.width as usize;
+        let content_length = if self.widest_line_len <= frame_length {
             0
         } else {
-            self.widest_line_len
+            self.widest_line_len - frame_length
         };
-        self.horizontal_scrollbar_state = ScrollbarState::new(line_width)
+        self.horizontal_scrollbar_state = ScrollbarState::new(content_length)
             .position(0)
-            .viewport_content_length(frame_width);
+            .viewport_content_length(frame_length);
     }
 
     fn set_vertical_scrollbar_state(&mut self) {
-        let height = self.inner_area.height as usize;
-        let len = if self.file_text.len() <= height {
+        let frame_length = self.inner_area.height as usize;
+        let content_length = if self.file_text.len() <= frame_length {
             0
         } else {
-            self.file_text.len()
+            self.file_text.len() - frame_length
         };
-        self.vertical_scrollbar_state = ScrollbarState::new(len)
+        self.vertical_scrollbar_state = ScrollbarState::new(content_length)
             .position(0)
-            .viewport_content_length(height);
+            .viewport_content_length(frame_length);
     }
 
     fn widest_line_length(lines: &[String]) -> usize {

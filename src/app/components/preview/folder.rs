@@ -187,14 +187,14 @@ impl<'a> Folder<'a> {
     }
 
     fn set_scrollbar_state(&mut self) {
-        let height = self.inner_area.height as usize;
-        let len = if self.entry_list.len() <= height {
+        let frame_length = self.inner_area.height as usize;
+        let content_length = if self.entry_list.len() <= frame_length {
             0
         } else {
-            self.entry_list.len()
+            self.entry_list.len() - frame_length
         };
-        self.scrollbar_state = ScrollbarState::new(len)
+        self.scrollbar_state = ScrollbarState::new(content_length)
             .position(0)
-            .viewport_content_length(height);
+            .viewport_content_length(frame_length);
     }
 }
