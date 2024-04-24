@@ -5,9 +5,9 @@
 
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Margin, Position, Rect};
-use ratatui::widgets::{List, Scrollbar, ScrollbarOrientation, ScrollbarState, ScrollbarPosition};
+use ratatui::widgets::{List, Scrollbar, ScrollbarOrientation, ScrollbarPosition, ScrollbarState};
 use ratatui::Frame;
 
 use crate::stateful_list::StatefulList;
@@ -22,13 +22,13 @@ use super::preview_pane::PreviewPane;
 pub(super) struct Folder<'a> {
     area: Rect,
     inner_area: Rect,
-    
+
     // The folder's directory entry
     entry: Option<PathBuf>,
 
     // The folder's contents
     entry_list: StatefulList<PathBuf>,
-    
+
     // Scrollbar stuff
     scrollbar: Scrollbar<'a>,
     scrollbar_state: ScrollbarState,
@@ -54,23 +54,51 @@ impl<'a> ListPane<PathBuf> for Folder<'a> {
     }
 
     fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
-        let position = Position { x: mouse_event.column, y: mouse_event.row };
-        // eprintln!("{:?}|{:?}|{:?}", position, self.area, self.inner_area);
-        match self.scrollbar.hit_test(position, self.scrollbar_area, &self.scrollbar_state) {
-            None => {
-                // eprintln!("None");
-            }
-            Some(scrollbar_position) => {
-                // eprintln!("{:?}", scrollbar_position);
-                match scrollbar_position {
-                    ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
-                    ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE)),
-                    // ScrollbarPosition::Thumb => {}
-                    ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE)),
-                    ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)),
-                    _ => {}
+        match mouse_event.kind {
+            MouseEventKind::Down(mouse_button) => {
+                if mouse_button == MouseButton::Left {
+                    let position = Position {
+                        x: mouse_event.column,
+                        y: mouse_event.row,
+                    };
+                    match self.scrollbar.hit_test(
+                        position,
+                        self.scrollbar_area,
+                        &self.scrollbar_state,
+                    ) {
+                        None => {}
+                        Some(scrollbar_position) => {
+                            match scrollbar_position {
+                                ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(
+                                    KeyCode::Up,
+                                    KeyModifiers::NONE,
+                                )),
+                                ScrollbarPosition::TrackLow => self.handle_key_event(
+                                    KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE),
+                                ),
+                                // ScrollbarPosition::Thumb => {}
+                                ScrollbarPosition::TrackHigh => self.handle_key_event(
+                                    KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE),
+                                ),
+                                ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(
+                                    KeyCode::Down,
+                                    KeyModifiers::NONE,
+                                )),
+                                _ => {}
+                            }
+                        }
+                    }
                 }
             }
+            MouseEventKind::ScrollUp => {
+                let key_event = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+                self.handle_key_event(key_event);
+            }
+            MouseEventKind::ScrollDown => {
+                let key_event = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+                self.handle_key_event(key_event);
+            }
+            _ => { /* ignore */ }
         }
     }
 
@@ -79,13 +107,13 @@ impl<'a> ListPane<PathBuf> for Folder<'a> {
             // Scroll up one line
             if !self.entry_list.at_offset_first() {
                 self.entry_list.previous_offset();
-                self.sync_scrollbar_position();
+                self.scrollbar_state.prev();
             }
         } else if util::is_down_key(key_event) {
             // Scroll down one line
             if self.entry_list.offset() < self.vertical_page_limit() {
                 self.entry_list.next_offset();
-                self.sync_scrollbar_position();
+                self.scrollbar_state.next();
             } else {
                 self.scrollbar_state.last();
             }

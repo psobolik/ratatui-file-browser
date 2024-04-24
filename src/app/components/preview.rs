@@ -65,7 +65,7 @@ impl<'a> Component for Preview<'a> {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
     }
-    
+
     fn has_focus(&self) -> bool {
         self.has_focus
     }
@@ -78,14 +78,15 @@ impl<'a> Component for Preview<'a> {
         self.area.contains(Position { x, y })
     }
 
-    fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
+    async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) -> Result<(), std::io::Error> {
         if let Some(preview_type) = &self.preview_type {
             match preview_type {
                 PreviewType::Folder => self.folder_pane.handle_mouse_event(mouse_event),
                 PreviewType::TextFile => self.text_pane.handle_mouse_event(mouse_event),
-                _ => {},
+                _ => {}
             }
         }
+        Ok(())
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {

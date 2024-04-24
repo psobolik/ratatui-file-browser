@@ -131,4 +131,3 @@ pub fn file_size(path: &Path) -> u64 {
         0
     }
 }
-

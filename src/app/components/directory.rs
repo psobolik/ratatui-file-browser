@@ -5,13 +5,13 @@
 
 use std::path::PathBuf;
 
+use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent},
 };
-use crossterm::event::MouseEvent;
-use ratatui::{layout::Rect, widgets::List, Frame};
 use ratatui::layout::Position;
+use ratatui::{layout::Rect, widgets::List, Frame};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::app::{components, styles};
@@ -32,7 +32,7 @@ impl Component for Directory {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
     }
-    
+
     fn has_focus(&self) -> bool {
         self.has_focus
     }
@@ -45,8 +45,38 @@ impl Component for Directory {
         self.area.contains(Position { x, y })
     }
 
-    fn handle_mouse_event(&mut self, _mouse_event: MouseEvent) {
-        // todo!()
+    async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) -> Result<(), std::io::Error> {
+        match mouse_event.kind {
+            MouseEventKind::Down(mouse_button) => {
+                // A left click on the selected item is converted into an Enter key event.
+                // A left click on an unselected item selects it.
+                if mouse_button == MouseButton::Left {
+                    if let Some(index) = self.index_from_row(mouse_event.row) {
+                        if self.is_selected(index) {
+                            let key_event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+                            self.handle_key_event(key_event).await?;
+                        } else {
+                            self.set_selected(index);
+                            self.event_tx
+                                .as_ref()
+                                .unwrap()
+                                .send(Event::SelectionChanged)
+                                .expect("Panic sending selection changed event");
+                        }
+                    }
+                }
+            }
+            MouseEventKind::ScrollUp => {
+                let key_event = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+                self.handle_key_event(key_event).await?;
+            }
+            MouseEventKind::ScrollDown => {
+                let key_event = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+                self.handle_key_event(key_event).await?;
+            }
+            _ => { /* ignore */ }
+        }
+        Ok(())
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {

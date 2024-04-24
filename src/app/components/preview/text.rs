@@ -5,10 +5,12 @@
 
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Margin, Position, Rect};
 use ratatui::prelude::Line;
-use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, ScrollbarPosition};
+use ratatui::widgets::{
+    Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarPosition, ScrollbarState,
+};
 use ratatui::Frame;
 
 use crate::util;
@@ -51,8 +53,10 @@ impl<'a> ListPane<String> for Text<'a> {
         self.widest_line_len = Self::widest_line_length(&lines);
         self.file_text = lines;
 
-        self.vertical_scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
-        self.horizontal_scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
+        self.vertical_scrollbar =
+            Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
+        self.horizontal_scrollbar =
+            Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
         self.set_horizontal_scrollbar_state();
         self.set_vertical_scrollbar_state();
     }
@@ -66,33 +70,79 @@ impl<'a> ListPane<String> for Text<'a> {
     }
 
     fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
-        let position = Position { x: mouse_event.column, y: mouse_event.row };
+        match mouse_event.kind {
+            MouseEventKind::Down(mouse_button) => {
+                if mouse_button == MouseButton::Left {
+                    let position = Position {
+                        x: mouse_event.column,
+                        y: mouse_event.row,
+                    };
 
-        match self.vertical_scrollbar.hit_test(position, self.vertical_scrollbar_area, &self.vertical_scrollbar_state) {
-            None => {}
-            Some(scrollbar_position) => {
-                match scrollbar_position {
-                    ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
-                    ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE)),
-                    // ScrollbarPosition::Thumb => {}
-                    ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE)),
-                    ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)),
-                    _ => {}
+                    match self.vertical_scrollbar.hit_test(
+                        position,
+                        self.vertical_scrollbar_area,
+                        &self.vertical_scrollbar_state,
+                    ) {
+                        None => {}
+                        Some(scrollbar_position) => {
+                            match scrollbar_position {
+                                ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(
+                                    KeyCode::Up,
+                                    KeyModifiers::NONE,
+                                )),
+                                ScrollbarPosition::TrackLow => self.handle_key_event(
+                                    KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE),
+                                ),
+                                // ScrollbarPosition::Thumb => {}
+                                ScrollbarPosition::TrackHigh => self.handle_key_event(
+                                    KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE),
+                                ),
+                                ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(
+                                    KeyCode::Down,
+                                    KeyModifiers::NONE,
+                                )),
+                                _ => {}
+                            }
+                        }
+                    }
+                    match self.horizontal_scrollbar.hit_test(
+                        position,
+                        self.horizontal_scrollbar_area,
+                        &self.horizontal_scrollbar_state,
+                    ) {
+                        None => {}
+                        Some(scrollbar_position) => {
+                            match scrollbar_position {
+                                ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(
+                                    KeyCode::Left,
+                                    KeyModifiers::NONE,
+                                )),
+                                ScrollbarPosition::TrackLow => self.handle_key_event(
+                                    KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL),
+                                ),
+                                // ScrollbarPosition::Thumb => {}
+                                ScrollbarPosition::TrackHigh => self.handle_key_event(
+                                    KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL),
+                                ),
+                                ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(
+                                    KeyCode::Right,
+                                    KeyModifiers::NONE,
+                                )),
+                                _ => {}
+                            }
+                        }
+                    }
                 }
             }
-        }
-        match self.horizontal_scrollbar.hit_test(position, self.horizontal_scrollbar_area, &self.horizontal_scrollbar_state) {
-            None => {}
-            Some(scrollbar_position) => {
-                match scrollbar_position {
-                    ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
-                    ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
-                    // ScrollbarPosition::Thumb => {}
-                    ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL)),
-                    ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
-                    _ => {}
-                }
+            MouseEventKind::ScrollUp => {
+                let key_event = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+                self.handle_key_event(key_event);
             }
+            MouseEventKind::ScrollDown => {
+                let key_event = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+                self.handle_key_event(key_event);
+            }
+            _ => { /* ignore */ }
         }
     }
 
@@ -147,9 +197,8 @@ impl<'a> ListPane<String> for Text<'a> {
                         let frame_height = self.inner_area.height as usize;
                         if self.vertical_offset > frame_height {
                             self.vertical_offset -= frame_height;
-                            self.vertical_scrollbar_state = self
-                                .vertical_scrollbar_state
-                                .position(self.vertical_offset);
+                            self.vertical_scrollbar_state =
+                                self.vertical_scrollbar_state.position(self.vertical_offset);
                         } else {
                             self.vertical_offset = 0;
                             self.vertical_scrollbar_state.first();
@@ -163,9 +212,8 @@ impl<'a> ListPane<String> for Text<'a> {
                         let limit = self.vertical_page_limit();
                         if self.vertical_offset + frame_height < limit {
                             self.vertical_offset += frame_height;
-                            self.vertical_scrollbar_state = self
-                                .vertical_scrollbar_state
-                                .position(self.vertical_offset);
+                            self.vertical_scrollbar_state =
+                                self.vertical_scrollbar_state.position(self.vertical_offset);
                         } else {
                             self.vertical_offset = limit;
                             self.vertical_scrollbar_state.last();
@@ -173,7 +221,9 @@ impl<'a> ListPane<String> for Text<'a> {
                     }
                 }
                 KeyCode::Left => {
-                    if self.can_scroll_horizontally() && key_event.modifiers == KeyModifiers::CONTROL {
+                    if self.can_scroll_horizontally()
+                        && key_event.modifiers == KeyModifiers::CONTROL
+                    {
                         // Scroll left one page
                         let frame_width = self.inner_area.width as usize;
                         if self.horizontal_offset > frame_width {
@@ -185,13 +235,18 @@ impl<'a> ListPane<String> for Text<'a> {
                             self.horizontal_offset = 0;
                             self.horizontal_scrollbar_state.first();
                         }
-                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL && self.horizontal_offset > 0 {
+                    } else if self.can_scroll_horizontally()
+                        && key_event.modifiers != KeyModifiers::CONTROL
+                        && self.horizontal_offset > 0
+                    {
                         self.horizontal_offset -= 1;
                         self.horizontal_scrollbar_state.prev();
                     }
                 }
                 KeyCode::Right => {
-                    if self.can_scroll_horizontally() && key_event.modifiers == KeyModifiers::CONTROL {
+                    if self.can_scroll_horizontally()
+                        && key_event.modifiers == KeyModifiers::CONTROL
+                    {
                         // Scroll right one page
                         let frame_width = self.inner_area.width as usize;
                         let limit = self.horizontal_page_limit();
@@ -204,7 +259,8 @@ impl<'a> ListPane<String> for Text<'a> {
                             self.horizontal_offset = limit;
                             self.horizontal_scrollbar_state.last();
                         }
-                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL
+                    } else if self.can_scroll_horizontally()
+                        && key_event.modifiers != KeyModifiers::CONTROL
                         && self.horizontal_offset < self.horizontal_page_limit()
                     {
                         // Scroll right one character
@@ -253,10 +309,8 @@ impl<'a> PreviewPane for Text<'a> {
                 .iter()
                 .map(|item| Line::from(item.to_string()))
                 .collect();
-            let paragraph = Paragraph::new(items.clone()).scroll((
-                self.vertical_offset as u16,
-                self.horizontal_offset as u16,
-            ));
+            let paragraph = Paragraph::new(items.clone())
+                .scroll((self.vertical_offset as u16, self.horizontal_offset as u16));
             frame.render_widget(block, self.area);
             frame.render_widget(paragraph, self.inner_area);
 

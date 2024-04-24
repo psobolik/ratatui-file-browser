@@ -14,7 +14,7 @@ pub trait ListPane<T> {
     fn clear(&mut self);
 
     fn handle_mouse_event(&mut self, mouse_event: MouseEvent);
-    
+
     fn handle_key_event(&mut self, key_event: KeyEvent);
 
     fn set_area(&mut self, area: Rect);

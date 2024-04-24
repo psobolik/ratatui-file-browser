@@ -31,7 +31,7 @@ struct FrameSet {
 pub struct App<'a> {
     pub should_quit: bool,
     fs_error: Option<io::Error>,
- 
+
     // Components
     head: Head,
     directory: Directory,
@@ -60,7 +60,7 @@ impl<'a> App<'a> {
 
         self.directory.set_area(frame_set.directory);
         self.preview.set_area(frame_set.preview);
-        
+
         if let Err(error) = self.directory.load_cwd().await {
             self.fs_error = Some(error);
         }
@@ -87,71 +87,40 @@ impl<'a> App<'a> {
     }
 
     async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
-        match mouse_event.kind {
-            // If there's an error showing, any mouse event that we might handle will clear it
-            // instead.
-            MouseEventKind::Down(..) | MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
-                if self.maybe_clear_error().await {
-                    return;
-                }
+        // If there's an error showing, any mouse down will clear it and quit processing the event.
+        // Any other mouse event will be ignored.
+        if self.fs_error.is_some() {
+            if let MouseEventKind::Down(..) = mouse_event.kind {
+                self.maybe_clear_error().await;
             }
-            // Ignore mouse events we don't handle. (Why not?)
-            _ => return,
+            return;
         }
 
-        match mouse_event.kind {
-            MouseEventKind::Down(mouse_button) => {
-                if mouse_button == MouseButton::Left {
-                    let directory_focused = self.directory.has_focus();
-                    if self.directory.hit_test(mouse_event.column, mouse_event.row) {
-                        if directory_focused {
-                            // A left click on the selected item in the focused directory pane is
-                            // converted into an Enter key event. A left click on an unselected item
-                            // selects it.
-                            if let Some(index) = self.directory.index_from_row(mouse_event.row) {
-                                if self.directory.is_selected(index) {
-                                    let key_event =
-                                        KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
-                                    self.handle_key_event(key_event).await;
-                                } else {
-                                    self.directory.set_selected(index);
-                                    self.load_selected_item().await;
-                                }
-                            }
-                        } else {
-                            self.focus_directory();
-                        }
-                    } else if self.preview.hit_test(mouse_event.column, mouse_event.row) {
-                        if directory_focused {
-                            self.focus_preview();
-                        } else {
-                            self.preview.handle_mouse_event(mouse_event);
-                        }
-                    }
+        // A left mouse click may change focused pane, but won't quit processing the event.
+        if let MouseEventKind::Down(mouse_button) = mouse_event.kind {
+            if mouse_button == MouseButton::Left {
+                if self.directory.has_focus()
+                    && self.preview.hit_test(mouse_event.column, mouse_event.row)
+                {
+                    self.focus_preview();
+                } else if self.preview.has_focus()
+                    && self.directory.hit_test(mouse_event.column, mouse_event.row)
+                {
+                    self.focus_directory();
                 }
             }
-            MouseEventKind::ScrollUp => {
-                let key_event = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
-                self.handle_key_event_by_position(key_event, mouse_event.column, mouse_event.row)
-                    .await;
-            }
-            MouseEventKind::ScrollDown => {
-                let key_event = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
-                self.handle_key_event_by_position(key_event, mouse_event.column, mouse_event.row)
-                    .await;
-            }
-            _ => { /* ignore */ }
         }
-    }
-
-    // Send a key event to the pane containing column/row
-    async fn handle_key_event_by_position(&mut self, key_event: KeyEvent, column: u16, row: u16) {
-        if self.directory.hit_test(column, row) {
-            if let Err(error) = self.directory.handle_key_event(key_event).await {
+        // Mouse events are sent to the focused pane.
+        if self.directory.has_focus()
+            && self.directory.hit_test(mouse_event.column, mouse_event.row)
+        {
+            if let Err(error) = self.directory.handle_mouse_event(mouse_event).await {
                 self.fs_error = Some(error);
             }
-        } else if self.preview.hit_test(column, row) {
-            if let Err(error) = self.preview.handle_key_event(key_event).await {
+        } else if self.preview.has_focus()
+            && self.preview.hit_test(mouse_event.column, mouse_event.row)
+        {
+            if let Err(error) = self.preview.handle_mouse_event(mouse_event).await {
                 self.fs_error = Some(error);
             }
         }
