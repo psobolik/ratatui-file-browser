@@ -29,14 +29,17 @@ pub(super) struct Text<'a> {
     // The file's contents
     file_text: Vec<String>,
 
+    // Horizontal scrollbar stuff
     widest_line_len: usize,
     horizontal_scrollbar: Scrollbar<'a>,
-    vertical_scrollbar: Scrollbar<'a>,
     horizontal_scrollbar_state: ScrollbarState,
-    vertical_scrollbar_state: ScrollbarState,
     horizontal_scrollbar_area: Rect,
-    vertical_scrollbar_area: Rect,
     horizontal_offset: usize,
+
+    // Vertical scrollbar stuff
+    vertical_scrollbar: Scrollbar<'a>,
+    vertical_scrollbar_state: ScrollbarState,
+    vertical_scrollbar_area: Rect,
     vertical_offset: usize,
 }
 
@@ -83,9 +86,9 @@ impl<'a> ListPane<String> for Text<'a> {
             Some(scrollbar_position) => {
                 match scrollbar_position {
                     ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
-                    // ScrollbarPosition::TrackLow => {} 
+                    ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
                     // ScrollbarPosition::Thumb => {}
-                    // ScrollbarPosition::TrackHigh => {},
+                    ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL)),
                     ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
                     _ => {}
                 }
@@ -154,8 +157,8 @@ impl<'a> ListPane<String> for Text<'a> {
                     }
                 }
                 KeyCode::PageDown => {
-                    // Scroll down one page
                     if self.can_scroll_vertically() {
+                        // Scroll down one page
                         let frame_height = self.inner_area.height as usize;
                         let limit = self.vertical_page_limit();
                         if self.vertical_offset + frame_height < limit {
@@ -170,17 +173,41 @@ impl<'a> ListPane<String> for Text<'a> {
                     }
                 }
                 KeyCode::Left => {
-                    // Scroll left one character
-                    if self.can_scroll_horizontally() && self.horizontal_offset > 0 {
+                    if self.can_scroll_horizontally() && key_event.modifiers == KeyModifiers::CONTROL {
+                        // Scroll left one page
+                        let frame_width = self.inner_area.width as usize;
+                        if self.horizontal_offset > frame_width {
+                            self.horizontal_offset -= frame_width;
+                            self.horizontal_scrollbar_state = self
+                                .horizontal_scrollbar_state
+                                .position(self.horizontal_offset);
+                        } else {
+                            self.horizontal_offset = 0;
+                            self.horizontal_scrollbar_state.first();
+                        }
+                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL && self.horizontal_offset > 0 {
                         self.horizontal_offset -= 1;
                         self.horizontal_scrollbar_state.prev();
                     }
                 }
                 KeyCode::Right => {
-                    // Scroll right one character
-                    if self.can_scroll_horizontally()
+                    if self.can_scroll_horizontally() && key_event.modifiers == KeyModifiers::CONTROL {
+                        // Scroll right one page
+                        let frame_width = self.inner_area.width as usize;
+                        let limit = self.horizontal_page_limit();
+                        if self.horizontal_offset + frame_width < limit {
+                            self.horizontal_offset += frame_width;
+                            self.horizontal_scrollbar_state = self
+                                .horizontal_scrollbar_state
+                                .position(self.horizontal_offset);
+                        } else {
+                            self.horizontal_offset = limit;
+                            self.horizontal_scrollbar_state.last();
+                        }
+                    } else if self.can_scroll_horizontally() && key_event.modifiers != KeyModifiers::CONTROL
                         && self.horizontal_offset < self.horizontal_page_limit()
                     {
+                        // Scroll right one character
                         self.horizontal_offset += 1;
                         self.horizontal_scrollbar_state.next();
                     }
