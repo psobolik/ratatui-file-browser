@@ -5,9 +5,9 @@
 
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::layout::{Margin, Rect};
-use ratatui::widgets::{List, Scrollbar, ScrollbarOrientation, ScrollbarState};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use ratatui::layout::{Margin, Position, Rect};
+use ratatui::widgets::{List, Scrollbar, ScrollbarOrientation, ScrollbarState, ScrollbarPosition};
 use ratatui::Frame;
 
 use crate::stateful_list::StatefulList;
@@ -19,25 +19,30 @@ use super::preview_pane;
 use super::preview_pane::PreviewPane;
 
 #[derive(Default)]
-pub(super) struct Folder {
+pub(super) struct Folder<'a> {
     area: Rect,
     inner_area: Rect,
-
+    
     // The folder's directory entry
     entry: Option<PathBuf>,
 
     // The folder's contents
     entry_list: StatefulList<PathBuf>,
+    
+    // Scrollbar stuff
+    scrollbar: Scrollbar<'a>,
     scrollbar_state: ScrollbarState,
+    scrollbar_area: Rect,
 }
 
-impl ListPane<PathBuf> for Folder {
+impl<'a> ListPane<PathBuf> for Folder<'a> {
     fn init(&mut self, entry: Option<&PathBuf>, items: Vec<PathBuf>, area: Rect) {
         self.set_area(area);
 
         self.entry = entry.cloned();
         self.entry_list = StatefulList::with_items(items);
 
+        self.scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
         self.set_scrollbar_state();
     }
 
@@ -46,6 +51,27 @@ impl ListPane<PathBuf> for Folder {
         self.entry_list = StatefulList::with_items(vec![]);
 
         self.set_scrollbar_state();
+    }
+
+    fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
+        let position = Position { x: mouse_event.column, y: mouse_event.row };
+        // eprintln!("{:?}|{:?}|{:?}", position, self.area, self.inner_area);
+        match self.scrollbar.hit_test(position, self.scrollbar_area, &self.scrollbar_state) {
+            None => {
+                // eprintln!("None");
+            }
+            Some(scrollbar_position) => {
+                // eprintln!("{:?}", scrollbar_position);
+                match scrollbar_position {
+                    ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
+                    ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE)),
+                    // ScrollbarPosition::Thumb => {}
+                    ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE)),
+                    ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)),
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -116,10 +142,14 @@ impl ListPane<PathBuf> for Folder {
             vertical: 1,
             horizontal: 2,
         });
+        self.scrollbar_area = area.inner(&Margin {
+            vertical: 1,
+            horizontal: 0,
+        });
     }
 }
 
-impl PreviewPane for Folder {
+impl<'a> PreviewPane for Folder<'a> {
     fn render(
         &mut self,
         area: Rect,
@@ -137,13 +167,9 @@ impl PreviewPane for Folder {
             frame.render_widget(block, self.area);
             frame.render_stateful_widget(list, self.inner_area, &mut self.entry_list.state);
 
-            let scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
             frame.render_stateful_widget(
-                scrollbar,
-                self.area.inner(&Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
+                self.scrollbar.clone(),
+                self.scrollbar_area,
                 &mut self.scrollbar_state,
             );
         }
@@ -151,7 +177,7 @@ impl PreviewPane for Folder {
     }
 }
 
-impl Folder {
+impl<'a> Folder<'a> {
     fn vertical_page_limit(&self) -> usize {
         <Self as PreviewPane>::page_limit(self.entry_list.len(), self.inner_area.height as usize)
     }

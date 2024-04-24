@@ -6,7 +6,7 @@
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::{Block, BorderType, Borders, Padding};
@@ -22,6 +22,7 @@ pub(crate) trait Component {
     fn has_focus(&self) -> bool;
     fn set_focus(&mut self, focus: bool);
     fn hit_test(&self, x: u16, y: u16) -> bool;
+    fn handle_mouse_event(&mut self, mouse_event: MouseEvent);
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error>;
     fn render(&mut self, area: Rect, frame: &mut Frame<'_>) -> Result<(), std::io::Error>;
 }

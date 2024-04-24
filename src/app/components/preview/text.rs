@@ -5,10 +5,10 @@
 
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::layout::{Margin, Rect};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use ratatui::layout::{Margin, Position, Rect};
 use ratatui::prelude::Line;
-use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState};
+use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, ScrollbarPosition};
 use ratatui::Frame;
 
 use crate::util;
@@ -19,7 +19,7 @@ use super::preview_pane;
 use super::preview_pane::PreviewPane;
 
 #[derive(Default)]
-pub(super) struct Text {
+pub(super) struct Text<'a> {
     area: Rect,
     inner_area: Rect,
 
@@ -30,13 +30,17 @@ pub(super) struct Text {
     file_text: Vec<String>,
 
     widest_line_len: usize,
-    file_horizontal_scrollbar_state: ScrollbarState,
-    file_vertical_scrollbar_state: ScrollbarState,
-    file_horizontal_offset: usize,
-    file_vertical_offset: usize,
+    horizontal_scrollbar: Scrollbar<'a>,
+    vertical_scrollbar: Scrollbar<'a>,
+    horizontal_scrollbar_state: ScrollbarState,
+    vertical_scrollbar_state: ScrollbarState,
+    horizontal_scrollbar_area: Rect,
+    vertical_scrollbar_area: Rect,
+    horizontal_offset: usize,
+    vertical_offset: usize,
 }
 
-impl ListPane<String> for Text {
+impl<'a> ListPane<String> for Text<'a> {
     fn init(&mut self, entry: Option<&PathBuf>, lines: Vec<String>, area: Rect) {
         self.set_area(area);
 
@@ -44,6 +48,8 @@ impl ListPane<String> for Text {
         self.widest_line_len = Self::widest_line_length(&lines);
         self.file_text = lines;
 
+        self.vertical_scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
+        self.horizontal_scrollbar = Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
         self.set_horizontal_scrollbar_state();
         self.set_vertical_scrollbar_state();
     }
@@ -56,19 +62,50 @@ impl ListPane<String> for Text {
         self.set_vertical_scrollbar_state();
     }
 
+    fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
+        let position = Position { x: mouse_event.column, y: mouse_event.row };
+
+        match self.vertical_scrollbar.hit_test(position, self.vertical_scrollbar_area, &self.vertical_scrollbar_state) {
+            None => {}
+            Some(scrollbar_position) => {
+                match scrollbar_position {
+                    ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
+                    ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE)),
+                    // ScrollbarPosition::Thumb => {}
+                    ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE)),
+                    ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)),
+                    _ => {}
+                }
+            }
+        }
+        match self.horizontal_scrollbar.hit_test(position, self.horizontal_scrollbar_area, &self.horizontal_scrollbar_state) {
+            None => {}
+            Some(scrollbar_position) => {
+                match scrollbar_position {
+                    ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
+                    // ScrollbarPosition::TrackLow => {} 
+                    // ScrollbarPosition::Thumb => {}
+                    // ScrollbarPosition::TrackHigh => {},
+                    ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
+                    _ => {}
+                }
+            }
+        }
+    }
+
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         if util::is_up_key(key_event) {
-            if self.can_scroll_vertically() && self.file_vertical_offset > 0 {
+            if self.can_scroll_vertically() && self.vertical_offset > 0 {
                 // Scroll up one line
-                self.file_vertical_offset -= 1;
-                self.file_vertical_scrollbar_state.prev();
+                self.vertical_offset -= 1;
+                self.vertical_scrollbar_state.prev();
             }
         } else if util::is_down_key(key_event) {
             if self.can_scroll_vertically() {
                 // Scroll down one line
-                if self.file_vertical_offset < self.vertical_page_limit() {
-                    self.file_vertical_offset += 1;
-                    self.file_vertical_scrollbar_state.next();
+                if self.vertical_offset < self.vertical_page_limit() {
+                    self.vertical_offset += 1;
+                    self.vertical_scrollbar_state.next();
                 }
             }
         } else {
@@ -77,42 +114,42 @@ impl ListPane<String> for Text {
                     if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
                     {
                         // Scroll to top of file
-                        self.file_vertical_offset = 0;
-                        self.file_vertical_scrollbar_state.first();
+                        self.vertical_offset = 0;
+                        self.vertical_scrollbar_state.first();
                     } else if self.can_scroll_horizontally()
                         && key_event.modifiers != KeyModifiers::CONTROL
                     {
                         // Go to beginning of line
-                        self.file_horizontal_offset = 0;
-                        self.file_horizontal_scrollbar_state.first();
+                        self.horizontal_offset = 0;
+                        self.horizontal_scrollbar_state.first();
                     }
                 }
                 KeyCode::End => {
                     if self.can_scroll_vertically() && key_event.modifiers == KeyModifiers::CONTROL
                     {
                         // Scroll to bottom of file
-                        self.file_vertical_offset = self.vertical_page_limit();
-                        self.file_vertical_scrollbar_state.last();
+                        self.vertical_offset = self.vertical_page_limit();
+                        self.vertical_scrollbar_state.last();
                     } else if self.can_scroll_horizontally()
                         && key_event.modifiers != KeyModifiers::CONTROL
                     {
                         // Scroll to end of line
-                        self.file_horizontal_offset = self.horizontal_page_limit();
-                        self.file_horizontal_scrollbar_state.last();
+                        self.horizontal_offset = self.horizontal_page_limit();
+                        self.horizontal_scrollbar_state.last();
                     }
                 }
                 KeyCode::PageUp => {
                     if self.can_scroll_vertically() {
                         // Scroll up one page
                         let frame_height = self.inner_area.height as usize;
-                        if self.file_vertical_offset > frame_height {
-                            self.file_vertical_offset -= frame_height;
-                            self.file_vertical_scrollbar_state = self
-                                .file_vertical_scrollbar_state
-                                .position(self.file_vertical_offset);
+                        if self.vertical_offset > frame_height {
+                            self.vertical_offset -= frame_height;
+                            self.vertical_scrollbar_state = self
+                                .vertical_scrollbar_state
+                                .position(self.vertical_offset);
                         } else {
-                            self.file_vertical_offset = 0;
-                            self.file_vertical_scrollbar_state.first();
+                            self.vertical_offset = 0;
+                            self.vertical_scrollbar_state.first();
                         }
                     }
                 }
@@ -121,31 +158,31 @@ impl ListPane<String> for Text {
                     if self.can_scroll_vertically() {
                         let frame_height = self.inner_area.height as usize;
                         let limit = self.vertical_page_limit();
-                        if self.file_vertical_offset + frame_height < limit {
-                            self.file_vertical_offset += frame_height;
-                            self.file_vertical_scrollbar_state = self
-                                .file_vertical_scrollbar_state
-                                .position(self.file_vertical_offset);
+                        if self.vertical_offset + frame_height < limit {
+                            self.vertical_offset += frame_height;
+                            self.vertical_scrollbar_state = self
+                                .vertical_scrollbar_state
+                                .position(self.vertical_offset);
                         } else {
-                            self.file_vertical_offset = limit;
-                            self.file_vertical_scrollbar_state.last();
+                            self.vertical_offset = limit;
+                            self.vertical_scrollbar_state.last();
                         }
                     }
                 }
                 KeyCode::Left => {
                     // Scroll left one character
-                    if self.can_scroll_horizontally() && self.file_horizontal_offset > 0 {
-                        self.file_horizontal_offset -= 1;
-                        self.file_horizontal_scrollbar_state.prev();
+                    if self.can_scroll_horizontally() && self.horizontal_offset > 0 {
+                        self.horizontal_offset -= 1;
+                        self.horizontal_scrollbar_state.prev();
                     }
                 }
                 KeyCode::Right => {
                     // Scroll right one character
                     if self.can_scroll_horizontally()
-                        && self.file_horizontal_offset < self.horizontal_page_limit()
+                        && self.horizontal_offset < self.horizontal_page_limit()
                     {
-                        self.file_horizontal_offset += 1;
-                        self.file_horizontal_scrollbar_state.next();
+                        self.horizontal_offset += 1;
+                        self.horizontal_scrollbar_state.next();
                     }
                 }
                 _ => {}
@@ -160,10 +197,18 @@ impl ListPane<String> for Text {
             vertical: 1,
             horizontal: 2,
         });
+        self.vertical_scrollbar_area = area.inner(&Margin {
+            vertical: 1,
+            horizontal: 0,
+        });
+        self.horizontal_scrollbar_area = self.area.inner(&Margin {
+            vertical: 0,
+            horizontal: 1,
+        });
     }
 }
 
-impl PreviewPane for Text {
+impl<'a> PreviewPane for Text<'a> {
     fn render(
         &mut self,
         area: Rect,
@@ -182,38 +227,28 @@ impl PreviewPane for Text {
                 .map(|item| Line::from(item.to_string()))
                 .collect();
             let paragraph = Paragraph::new(items.clone()).scroll((
-                self.file_vertical_offset as u16,
-                self.file_horizontal_offset as u16,
+                self.vertical_offset as u16,
+                self.horizontal_offset as u16,
             ));
             frame.render_widget(block, self.area);
             frame.render_widget(paragraph, self.inner_area);
 
-            let vertical_scrollbar =
-                Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
             frame.render_stateful_widget(
-                vertical_scrollbar,
-                self.area.inner(&Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
-                &mut self.file_vertical_scrollbar_state,
+                self.vertical_scrollbar.clone(),
+                self.vertical_scrollbar_area,
+                &mut self.vertical_scrollbar_state,
             );
 
-            let horizontal_scrollbar =
-                Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
             frame.render_stateful_widget(
-                horizontal_scrollbar,
-                self.area.inner(&Margin {
-                    vertical: 0,
-                    horizontal: 1,
-                }),
-                &mut self.file_horizontal_scrollbar_state,
+                self.horizontal_scrollbar.clone(),
+                self.horizontal_scrollbar_area,
+                &mut self.horizontal_scrollbar_state,
             );
         }
         Ok(())
     }
 }
-impl Text {
+impl<'a> Text<'a> {
     fn can_scroll_horizontally(&self) -> bool {
         self.widest_line_len > self.inner_area.width as usize
     }
@@ -237,7 +272,7 @@ impl Text {
         } else {
             self.widest_line_len
         };
-        self.file_horizontal_scrollbar_state = ScrollbarState::new(line_width)
+        self.horizontal_scrollbar_state = ScrollbarState::new(line_width)
             .position(0)
             .viewport_content_length(frame_width);
     }
@@ -249,7 +284,7 @@ impl Text {
         } else {
             self.file_text.len()
         };
-        self.file_vertical_scrollbar_state = ScrollbarState::new(len)
+        self.vertical_scrollbar_state = ScrollbarState::new(len)
             .position(0)
             .viewport_content_length(height);
     }

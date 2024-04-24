@@ -9,7 +9,6 @@ use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent, KeyModifiers},
 };
-use ratatui::layout::Rect;
 use ratatui::{prelude::Line, widgets::ListItem};
 
 use crate::{constants, stateful_list::StatefulList};
@@ -33,7 +32,7 @@ pub fn entry_path(path: &Path) -> String {
     } else if let Some(path_string) = path.to_str() {
         path_string.to_string()
     } else {
-        String::default() // Path has no name or it can't be converted?
+        String::default() // Path has no name or it can't be converted
     }
 }
 
@@ -133,6 +132,3 @@ pub fn file_size(path: &Path) -> u64 {
     }
 }
 
-pub fn is_in_rect(x: u16, y: u16, rect: Rect) -> bool {
-    x >= rect.left() && x < rect.right() && y >= rect.top() && y < rect.bottom()
-}

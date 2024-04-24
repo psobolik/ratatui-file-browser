@@ -5,9 +5,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, MouseEvent};
 use probably_binary::{EntryType, FileType};
-use ratatui::layout::Alignment;
+use ratatui::layout::{Alignment, Position};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::{layout::Rect, Frame};
 
@@ -44,7 +44,7 @@ enum PreviewType {
 }
 
 #[derive(Default)]
-pub struct Preview {
+pub struct Preview<'a> {
     has_focus: bool,
     area: Rect,
 
@@ -57,11 +57,11 @@ pub struct Preview {
     binary_pane: Binary,
     other_pane: Other,
     oversize_pane: Oversize,
-    folder_pane: Folder,
-    text_pane: Text,
+    folder_pane: Folder<'a>,
+    text_pane: Text<'a>,
 }
 
-impl Component for Preview {
+impl<'a> Component for Preview<'a> {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
     }
@@ -75,7 +75,17 @@ impl Component for Preview {
     }
 
     fn hit_test(&self, x: u16, y: u16) -> bool {
-        util::is_in_rect(x, y, self.area)
+        self.area.contains(Position { x, y })
+    }
+
+    fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
+        if let Some(preview_type) = &self.preview_type {
+            match preview_type {
+                PreviewType::Folder => self.folder_pane.handle_mouse_event(mouse_event),
+                PreviewType::TextFile => self.text_pane.handle_mouse_event(mouse_event),
+                _ => {},
+            }
+        }
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
@@ -119,7 +129,7 @@ impl Component for Preview {
     }
 }
 
-impl Preview {
+impl<'a> Preview<'a> {
     pub fn clear(&mut self) {
         self.entry = None;
         self.preview_type = None;

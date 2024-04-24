@@ -9,7 +9,9 @@ use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent},
 };
+use crossterm::event::MouseEvent;
 use ratatui::{layout::Rect, widgets::List, Frame};
+use ratatui::layout::Position;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::app::{components, styles};
@@ -40,7 +42,11 @@ impl Component for Directory {
     }
 
     fn hit_test(&self, x: u16, y: u16) -> bool {
-        util::is_in_rect(x, y, self.area)
+        self.area.contains(Position { x, y })
+    }
+
+    fn handle_mouse_event(&mut self, _mouse_event: MouseEvent) {
+        // todo!()
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {

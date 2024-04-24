@@ -28,17 +28,17 @@ struct FrameSet {
 }
 
 #[derive(Default)]
-pub struct App {
+pub struct App<'a> {
     pub should_quit: bool,
     fs_error: Option<io::Error>,
  
     // Components
     head: Head,
     directory: Directory,
-    preview: Preview,
+    preview: Preview<'a>,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn set_event_tx(&mut self, event_tx: Option<UnboundedSender<Event>>) {
         self.directory.set_event_tx(event_tx);
     }
@@ -121,10 +121,12 @@ impl App {
                         } else {
                             self.focus_directory();
                         }
-                    } else if self.preview.hit_test(mouse_event.column, mouse_event.row)
-                        && directory_focused
-                    {
-                        self.focus_preview();
+                    } else if self.preview.hit_test(mouse_event.column, mouse_event.row) {
+                        if directory_focused {
+                            self.focus_preview();
+                        } else {
+                            self.preview.handle_mouse_event(mouse_event);
+                        }
                     }
                 }
             }
