@@ -13,7 +13,7 @@ publish = false
 [dependencies]
 color-eyre = "0.6.2"
 crossterm = { version = "0.27.0", features = ["event-stream"] }
-ratatui = { path = "C:\\Users\\psobo\\source\\ratatui" }
+ratatui = { git = "https://github.com/psobolik/ratatui.git", branch = "scrollbar_hit_test" }
 tokio = { version = "1.34.0", features = ["full"] }
 tokio-util = "0.7.10"
 futures = "0.3.29"
