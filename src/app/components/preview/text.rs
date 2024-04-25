@@ -57,16 +57,14 @@ impl<'a> ListPane<String> for Text<'a> {
             Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
         self.horizontal_scrollbar =
             Scrollbar::default().orientation(ScrollbarOrientation::HorizontalBottom);
-        self.set_horizontal_scrollbar_state();
-        self.set_vertical_scrollbar_state();
+        self.set_scrollbar_state();
     }
 
     fn clear(&mut self) {
         self.entry = None;
         self.file_text = vec![];
 
-        self.set_horizontal_scrollbar_state();
-        self.set_vertical_scrollbar_state();
+        self.set_scrollbar_state();
     }
 
     fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
@@ -288,6 +286,7 @@ impl<'a> ListPane<String> for Text<'a> {
             vertical: 0,
             horizontal: 1,
         });
+        self.set_scrollbar_state();
     }
 }
 
@@ -346,28 +345,41 @@ impl<'a> Text<'a> {
         <Self as PreviewPane>::page_limit(self.widest_line_len, self.inner_area.width as usize)
     }
 
+    fn set_scrollbar_state(&mut self) {
+        self.set_horizontal_scrollbar_state();
+        self.set_vertical_scrollbar_state();
+    }
+
     fn set_horizontal_scrollbar_state(&mut self) {
         let frame_length = self.inner_area.width as usize;
-        let content_length = if self.widest_line_len <= frame_length {
-            0
+        if self.widest_line_len <= frame_length {
+            // Hide scrollbar
+            self.horizontal_scrollbar_state = self.horizontal_scrollbar_state
+                .position(0)
+                .content_length(0);
+            self.horizontal_offset = 0;
         } else {
-            self.widest_line_len - frame_length
-        };
-        self.horizontal_scrollbar_state = ScrollbarState::new(content_length)
-            .position(0)
-            .viewport_content_length(frame_length);
+            // Show scrollbar
+            self.horizontal_scrollbar_state = self.horizontal_scrollbar_state
+                .content_length(self.widest_line_len - frame_length)
+                .viewport_content_length(frame_length);
+        }
     }
 
     fn set_vertical_scrollbar_state(&mut self) {
         let frame_length = self.inner_area.height as usize;
-        let content_length = if self.file_text.len() <= frame_length {
-            0
+        if self.file_text.len() <= frame_length {
+            // Hide scrollbar
+            self.vertical_scrollbar_state = self.vertical_scrollbar_state
+                .position(0)
+                .content_length(0);
+            self.vertical_offset = 0;
         } else {
-            self.file_text.len() - frame_length
+            // Show scrollbar
+            self.vertical_scrollbar_state = self.vertical_scrollbar_state
+                .content_length(self.file_text.len() - frame_length)
+                .viewport_content_length(frame_length);
         };
-        self.vertical_scrollbar_state = ScrollbarState::new(content_length)
-            .position(0)
-            .viewport_content_length(frame_length);
     }
 
     fn widest_line_length(lines: &[String]) -> usize {

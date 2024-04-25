@@ -174,6 +174,7 @@ impl<'a> ListPane<PathBuf> for Folder<'a> {
             vertical: 1,
             horizontal: 0,
         });
+        self.set_scrollbar_state();
     }
 }
 
@@ -216,13 +217,18 @@ impl<'a> Folder<'a> {
 
     fn set_scrollbar_state(&mut self) {
         let frame_length = self.inner_area.height as usize;
-        let content_length = if self.entry_list.len() <= frame_length {
-            0
+        if self.entry_list.len() <= frame_length {
+            // Hide scrollbar
+            self.scrollbar_state = self.scrollbar_state
+                .position(0)
+                .content_length(0);
+            self.entry_list.first();
         } else {
-            self.entry_list.len() - frame_length
+            // Show scrollbar
+            self.scrollbar_state = self.scrollbar_state
+                .content_length(self.entry_list.len() - frame_length)
+                .viewport_content_length(frame_length);
+            
         };
-        self.scrollbar_state = ScrollbarState::new(content_length)
-            .position(0)
-            .viewport_content_length(frame_length);
     }
 }

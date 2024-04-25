@@ -48,6 +48,7 @@ impl<'a> App<'a> {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
             Event::Init(width, height) => self.handle_init_event(width, height).await,
             Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event).await,
+            Event::Resize(width, height) => self.handle_resize_event(width, height),
             Event::SelectionChanged => self.load_selected_item().await,
             Event::DirectoryChanged => self.handle_directory_changed(),
             _ => {}
@@ -152,6 +153,13 @@ impl<'a> App<'a> {
                 }
             }
         }
+    }
+
+    fn handle_resize_event(&mut self, width: u16, height: u16) {
+        let area = Rect::new(0, 0, width, height);
+        let frame_set = Self::calculate_frames(area);
+        self.directory.set_area(frame_set.directory);
+        self.preview.set_area(frame_set.preview);
     }
 
     fn quit(&mut self) {
@@ -261,5 +269,5 @@ impl<'a> App<'a> {
             directory: main[0],
             preview: main[1],
         }
-    }
+    }   
 }

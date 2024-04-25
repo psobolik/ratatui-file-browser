@@ -64,6 +64,8 @@ pub struct Preview<'a> {
 impl<'a> Component for Preview<'a> {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
+        self.folder_pane.set_area(self.area);
+        self.text_pane.set_area(self.area);
     }
 
     fn has_focus(&self) -> bool {
