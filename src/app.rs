@@ -269,5 +269,5 @@ impl<'a> App<'a> {
             directory: main[0],
             preview: main[1],
         }
-    }   
+    }
 }

@@ -306,7 +306,7 @@ impl<'a> PreviewPane for Text<'a> {
             let items: Vec<Line> = self
                 .file_text
                 .iter()
-                .map(|item| Line::from(item.to_string()))
+                .map(|item| Line::from(item.replace('\t', "        ")))
                 .collect();
             let paragraph = Paragraph::new(items.clone())
                 .scroll((self.vertical_offset as u16, self.horizontal_offset as u16));
@@ -354,13 +354,15 @@ impl<'a> Text<'a> {
         let frame_length = self.inner_area.width as usize;
         if self.widest_line_len <= frame_length {
             // Hide scrollbar
-            self.horizontal_scrollbar_state = self.horizontal_scrollbar_state
+            self.horizontal_scrollbar_state = self
+                .horizontal_scrollbar_state
                 .position(0)
                 .content_length(0);
             self.horizontal_offset = 0;
         } else {
             // Show scrollbar
-            self.horizontal_scrollbar_state = self.horizontal_scrollbar_state
+            self.horizontal_scrollbar_state = self
+                .horizontal_scrollbar_state
                 .content_length(self.widest_line_len - frame_length)
                 .viewport_content_length(frame_length);
         }
@@ -370,13 +372,13 @@ impl<'a> Text<'a> {
         let frame_length = self.inner_area.height as usize;
         if self.file_text.len() <= frame_length {
             // Hide scrollbar
-            self.vertical_scrollbar_state = self.vertical_scrollbar_state
-                .position(0)
-                .content_length(0);
+            self.vertical_scrollbar_state =
+                self.vertical_scrollbar_state.position(0).content_length(0);
             self.vertical_offset = 0;
         } else {
             // Show scrollbar
-            self.vertical_scrollbar_state = self.vertical_scrollbar_state
+            self.vertical_scrollbar_state = self
+                .vertical_scrollbar_state
                 .content_length(self.file_text.len() - frame_length)
                 .viewport_content_length(frame_length);
         };

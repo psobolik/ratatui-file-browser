@@ -219,16 +219,14 @@ impl<'a> Folder<'a> {
         let frame_length = self.inner_area.height as usize;
         if self.entry_list.len() <= frame_length {
             // Hide scrollbar
-            self.scrollbar_state = self.scrollbar_state
-                .position(0)
-                .content_length(0);
+            self.scrollbar_state = self.scrollbar_state.position(0).content_length(0);
             self.entry_list.first();
         } else {
             // Show scrollbar
-            self.scrollbar_state = self.scrollbar_state
+            self.scrollbar_state = self
+                .scrollbar_state
                 .content_length(self.entry_list.len() - frame_length)
                 .viewport_content_length(frame_length);
-            
         };
     }
 }
