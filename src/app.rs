@@ -222,7 +222,7 @@ impl<'a> App<'a> {
 
     fn render_error_popup(&self, error: &str, frame: &mut Frame, frame_size: Rect) {
         let text = Paragraph::new(Text::from(error)).style(styles::ERROR_STYLE);
-        let block = Block::default().title("Error").borders(Borders::ALL);
+        let block = Block::bordered().title("Error");
 
         let error_len = error.len() as u16;
         let area = Self::centered_rect(error_len + 4, 3, frame_size);

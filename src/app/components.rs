@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::layout::Rect;
 use ratatui::prelude::{Color, Modifier, Style};
-use ratatui::widgets::{Block, BorderType, Borders, Padding};
+use ratatui::widgets::{Block, BorderType, Padding};
 use ratatui::Frame;
 use tokio::fs;
 
@@ -64,15 +64,13 @@ fn focused_block<'a>() -> Block<'a> {
         .fg(Color::LightBlue)
         .add_modifier(Modifier::BOLD);
 
-    Block::default()
-        .borders(Borders::ALL)
+    Block::bordered()
         .border_type(BorderType::Double)
         .border_style(FOCUSED_BLOCK_STYLE)
         .padding(Padding::horizontal(1))
 }
 
 fn default_block<'a>() -> Block<'a> {
-    Block::default()
-        .borders(Borders::ALL)
+    Block::bordered()
         .padding(Padding::horizontal(1))
 }

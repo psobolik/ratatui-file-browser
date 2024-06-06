@@ -274,15 +274,15 @@ impl<'a> ListPane<String> for Text<'a> {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
         // Give the content some horizontal padding
-        self.inner_area = area.inner(&Margin {
+        self.inner_area = area.inner(Margin {
             vertical: 1,
             horizontal: 2,
         });
-        self.vertical_scrollbar_area = area.inner(&Margin {
+        self.vertical_scrollbar_area = area.inner(Margin {
             vertical: 1,
             horizontal: 0,
         });
-        self.horizontal_scrollbar_area = self.area.inner(&Margin {
+        self.horizontal_scrollbar_area = self.area.inner(Margin {
             vertical: 0,
             horizontal: 1,
         });

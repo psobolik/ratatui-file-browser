@@ -166,11 +166,11 @@ impl<'a> ListPane<PathBuf> for Folder<'a> {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
         // Give the content some horizontal padding
-        self.inner_area = area.inner(&Margin {
+        self.inner_area = area.inner(Margin {
             vertical: 1,
             horizontal: 2,
         });
-        self.scrollbar_area = area.inner(&Margin {
+        self.scrollbar_area = area.inner(Margin {
             vertical: 1,
             horizontal: 0,
         });
