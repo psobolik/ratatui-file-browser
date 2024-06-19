@@ -50,8 +50,11 @@ impl<'a> ListPane<String> for Text<'a> {
         self.set_area(area);
 
         self.entry = entry.cloned();
-        self.widest_line_len = Self::widest_line_length(&lines);
-        self.file_text = lines;
+        self.file_text = lines
+            .iter()
+            .map(|item| item.replace('\t', "        "))
+            .collect();
+        self.widest_line_len = Self::widest_line_length(&self.file_text);
 
         self.vertical_scrollbar =
             Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
@@ -306,7 +309,7 @@ impl<'a> PreviewPane for Text<'a> {
             let items: Vec<Line> = self
                 .file_text
                 .iter()
-                .map(|item| Line::from(item.replace('\t', "        ")))
+                .map(|item| Line::from(item.clone()))
                 .collect();
             let paragraph = Paragraph::new(items.clone())
                 .scroll((self.vertical_offset as u16, self.horizontal_offset as u16));
