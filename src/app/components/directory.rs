@@ -123,6 +123,16 @@ impl Component for Directory {
                         directory_changed = true;
                     }
                 }
+                // If there's a parent directory open it
+                KeyCode::Backspace => {
+                    if self.has_parent_directory() {
+                        self.set_selected(0);
+                        if self.cd()? {
+                            selection_changed = true;
+                            directory_changed = true;
+                        }
+                    }
+                }
                 key_code => {
                     // Move selection to item starting with character
                     if let Char(c) = key_code {
@@ -156,7 +166,7 @@ impl Component for Directory {
         let items = util::list_items(&self.items, frame.size().height as usize);
         // Don't include parent directory in count
         let mut item_count = self.items.len();
-        if (util::entry_name(&self.items[0]) == constants::PARENT_DIRECTORY) && item_count > 0 {
+        if self.has_parent_directory() {
             item_count -= 1;
         }
         let item_count_string = format!("[{item_count} items]");
@@ -285,5 +295,9 @@ impl Directory {
         self.items
             .selected()
             .map(|selected| self.items[selected].clone())
+    }
+    
+    fn has_parent_directory(&self) -> bool {
+        util::entry_name(&self.items[0]) == constants::PARENT_DIRECTORY && self.items.len() > 0
     }
 }
