@@ -29,7 +29,7 @@ pub trait MessagePane {
         area: Rect,
     ) -> Result<(), Error> {
         let title = preview_pane::file_title(entry)?;
-        let block = components::component_block(has_focus).title(title);
+        let block = components::helpers::component_block(has_focus).title(title);
         frame.render_widget(block, area);
         frame.render_widget(
             Paragraph::new(message)

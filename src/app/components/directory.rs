@@ -170,7 +170,7 @@ impl Component for Directory {
             item_count -= 1;
         }
         let item_count_string = format!("[{item_count} items]");
-        let block = components::component_block(self.has_focus).title(item_count_string);
+        let block = components::helpers::component_block(self.has_focus).title(item_count_string);
         let list = List::new(items)
             .block(block)
             .highlight_style(styles::LIST_HIGHLIGHT_STYLE);
@@ -209,7 +209,7 @@ impl Directory {
 
     pub async fn load_cwd(&mut self) -> Result<(), std::io::Error> {
         let cwd = self.get_cwd()?;
-        let entries = components::read_directory(&cwd).await?;
+        let entries = components::helpers::read_directory(&cwd).await?;
         let mut result = vec![];
         // Prepend parent directory entry if there is one
         if cwd.parent().is_some() {

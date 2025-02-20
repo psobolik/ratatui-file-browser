@@ -21,11 +21,7 @@ pub trait PreviewPane {
     ) -> Result<(), std::io::Error>;
 
     fn page_limit(total_size: usize, page_size: usize) -> usize {
-        if total_size > page_size {
-            total_size - page_size
-        } else {
-            0
-        }
+        total_size.saturating_sub(page_size)
     }
 }
 

@@ -35,7 +35,7 @@ pub(super) struct Folder<'a> {
     scrollbar_area: Rect,
 }
 
-impl<'a> ListPane<PathBuf> for Folder<'a> {
+impl ListPane<PathBuf> for Folder<'_> {
     fn init(&mut self, entry: Option<&PathBuf>, items: Vec<PathBuf>, area: Rect) {
         self.set_area(area);
 
@@ -178,7 +178,7 @@ impl<'a> ListPane<PathBuf> for Folder<'a> {
     }
 }
 
-impl<'a> PreviewPane for Folder<'a> {
+impl PreviewPane for Folder<'_> {
     fn render(
         &mut self,
         area: Rect,
@@ -189,7 +189,7 @@ impl<'a> PreviewPane for Folder<'a> {
 
         if let Some(entry) = &self.entry {
             let title = preview_pane::folder_title(entry, self.entry_list.len())?;
-            let block = components::component_block(has_focus).title(title);
+            let block = components::helpers::component_block(has_focus).title(title);
 
             let items = util::list_items(&self.entry_list, self.inner_area.height as usize);
             let list = List::new(items);
@@ -204,9 +204,13 @@ impl<'a> PreviewPane for Folder<'a> {
         }
         Ok(())
     }
+
+    fn page_limit(total_size: usize, page_size: usize) -> usize {
+        total_size.saturating_sub(page_size)
+    }
 }
 
-impl<'a> Folder<'a> {
+impl Folder<'_> {
     fn vertical_page_limit(&self) -> usize {
         <Self as PreviewPane>::page_limit(self.entry_list.len(), self.inner_area.height as usize)
     }

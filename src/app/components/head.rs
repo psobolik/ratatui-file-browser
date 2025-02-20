@@ -19,14 +19,12 @@ impl Head {
 
     pub fn render(&mut self, area: Rect, frame: &mut Frame) {
         let text = if let Some(path) = &self.path {
-            util::entry_path(path.as_path())
+            let path_str = util::entry_path(path.as_path());
+            // Trim path string so that (with brackets) it will fit width of window
+            util::clip_text(path_str.as_str(), (area.width - 2) as usize)
         } else {
             String::new()
         };
-        let text = format!("[{text}]");
-        frame.render_widget(
-            Paragraph::new(util::clip_string(&text, area.width as usize)),
-            area,
-        );
+        frame.render_widget(Paragraph::new(format!("[{text}]")), area);
     }
 }

@@ -61,7 +61,7 @@ pub struct Preview<'a> {
     text_pane: Text<'a>,
 }
 
-impl<'a> Component for Preview<'a> {
+impl Component for Preview<'_> {
     fn set_area(&mut self, area: Rect) {
         self.area = area;
         self.folder_pane.set_area(self.area);
@@ -132,7 +132,7 @@ impl<'a> Component for Preview<'a> {
     }
 }
 
-impl<'a> Preview<'a> {
+impl Preview<'_> {
     pub fn clear(&mut self) {
         self.entry = None;
         self.preview_type = None;
@@ -194,7 +194,7 @@ impl<'a> Preview<'a> {
             match probably_binary::entry_type(entry) {
                 Ok(entry_type) => match entry_type {
                     EntryType::Directory => {
-                        match components::read_directory(entry).await {
+                        match components::helpers::read_directory(entry).await {
                             Ok(entries) => self.set_folder_items(entry, entries),
                             Err(error) => self.set_error(entry, error.to_string()),
                         };
@@ -215,7 +215,7 @@ impl<'a> Preview<'a> {
                 if util::file_size(entry) >= 50_000 {
                     self.set_oversize_text_file(entry);
                 } else {
-                    match components::read_file(entry).await {
+                    match components::helpers::read_file(entry).await {
                         Ok(lines) => {
                             self.set_text_file(entry, lines);
                         }
@@ -228,7 +228,7 @@ impl<'a> Preview<'a> {
     }
 
     fn render_error(&self, message: &str, frame: &mut Frame<'_>) {
-        let block = components::component_block(self.has_focus);
+        let block = components::helpers::component_block(self.has_focus);
         frame.render_widget(block, self.area);
         frame.render_widget(
             Paragraph::new(ratatui::prelude::Text::from(message))

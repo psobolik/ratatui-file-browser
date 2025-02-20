@@ -13,12 +13,12 @@ use ratatui::{prelude::Line, widgets::ListItem};
 
 use crate::{constants, stateful_list::StatefulList};
 
-pub fn clip_string(string: &String, width: usize) -> String {
-    if string.len() > width {
-        let start = string.len() - width + 1;
-        format!("…{}", &string[start..])
+pub fn clip_text(text: &str, width: usize) -> String {
+    if text.len() > width {
+        let start = text.len() - width + 1;
+        format!("…{}", &text[start..])
     } else {
-        string.to_string()
+        text.to_string()
     }
 }
 

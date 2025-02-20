@@ -45,7 +45,7 @@ pub(super) struct Text<'a> {
     vertical_offset: usize,
 }
 
-impl<'a> ListPane<String> for Text<'a> {
+impl ListPane<String> for Text<'_> {
     fn init(&mut self, entry: Option<&PathBuf>, lines: Vec<String>, area: Rect) {
         self.set_area(area);
 
@@ -293,7 +293,7 @@ impl<'a> ListPane<String> for Text<'a> {
     }
 }
 
-impl<'a> PreviewPane for Text<'a> {
+impl PreviewPane for Text<'_> {
     fn render(
         &mut self,
         area: Rect,
@@ -304,7 +304,7 @@ impl<'a> PreviewPane for Text<'a> {
 
         if let Some(entry) = &self.entry {
             let title = preview_pane::file_title(entry)?;
-            let block = components::component_block(has_focus).title(title);
+            let block = components::helpers::component_block(has_focus).title(title);
 
             let items: Vec<Line> = self
                 .file_text
@@ -331,7 +331,7 @@ impl<'a> PreviewPane for Text<'a> {
         Ok(())
     }
 }
-impl<'a> Text<'a> {
+impl Text<'_> {
     fn can_scroll_horizontally(&self) -> bool {
         self.widest_line_len > self.inner_area.width as usize
     }

@@ -13,8 +13,7 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::app::{
-    components::directory::Directory, components::head::Head, components::preview::Preview,
-    components::Component,
+    components::Component, components::Directory, components::Head, components::Preview,
 };
 use crate::tui::Event;
 
@@ -38,7 +37,7 @@ pub struct App<'a> {
     preview: Preview<'a>,
 }
 
-impl<'a> App<'a> {
+impl App<'_> {
     pub fn set_event_tx(&mut self, event_tx: Option<UnboundedSender<Event>>) {
         self.directory.set_event_tx(event_tx);
     }
@@ -48,19 +47,16 @@ impl<'a> App<'a> {
             Event::Key(key_event) => self.handle_key_event(key_event).await,
             Event::Init(width, height) => self.handle_init_event(width, height).await,
             Event::Mouse(mouse_event) => self.handle_mouse_event(mouse_event).await,
-            Event::Resize(width, height) => self.handle_resize_event(width, height),
+            Event::Resize(width, height) => self.set_size(width, height),
             Event::SelectionChanged => self.load_selected_item().await,
             Event::DirectoryChanged => self.handle_directory_changed(),
+            Event::Paste(_s) => {} // This is to keep Clippy happy
             _ => {}
         }
     }
 
     async fn handle_init_event(&mut self, width: u16, height: u16) {
-        let area = Rect::new(0, 0, width, height);
-        let frame_set = Self::calculate_frames(area);
-
-        self.directory.set_area(frame_set.directory);
-        self.preview.set_area(frame_set.preview);
+        self.set_size(width, height);
 
         if let Err(error) = self.directory.load_cwd().await {
             self.fs_error = Some(error);
@@ -88,8 +84,8 @@ impl<'a> App<'a> {
     }
 
     async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
-        // If there's an error showing, any mouse down will clear it and quit processing the event.
-        // Any other mouse event will be ignored.
+        // If there's an error showing, a mouse down event will clear it,
+        // and any other mouse event will be ignored.
         if self.fs_error.is_some() {
             if let MouseEventKind::Down(..) = mouse_event.kind {
                 self.maybe_clear_error().await;
@@ -97,30 +93,25 @@ impl<'a> App<'a> {
             return;
         }
 
-        // A left mouse click may change focused pane, but won't quit processing the event.
+        let click_in_directory = self.directory.hit_test(mouse_event.column, mouse_event.row);
+        let click_in_preview = self.preview.hit_test(mouse_event.column, mouse_event.row);
+
+        // A left mouse click may change focused pane before processing the event.
         if let MouseEventKind::Down(mouse_button) = mouse_event.kind {
             if mouse_button == MouseButton::Left {
-                if self.directory.has_focus()
-                    && self.preview.hit_test(mouse_event.column, mouse_event.row)
-                {
+                if self.directory.has_focus() && click_in_preview {
                     self.focus_preview();
-                } else if self.preview.has_focus()
-                    && self.directory.hit_test(mouse_event.column, mouse_event.row)
-                {
+                } else if self.preview.has_focus() && click_in_directory {
                     self.focus_directory();
                 }
             }
         }
-        // Mouse events are sent to the focused pane.
-        if self.directory.has_focus()
-            && self.directory.hit_test(mouse_event.column, mouse_event.row)
-        {
+        // Mouse events are sent to the focused pane (which may have just changed).
+        if self.directory.has_focus() && click_in_directory {
             if let Err(error) = self.directory.handle_mouse_event(mouse_event).await {
                 self.fs_error = Some(error);
             }
-        } else if self.preview.has_focus()
-            && self.preview.hit_test(mouse_event.column, mouse_event.row)
-        {
+        } else if self.preview.has_focus() && click_in_preview {
             if let Err(error) = self.preview.handle_mouse_event(mouse_event).await {
                 self.fs_error = Some(error);
             }
@@ -155,7 +146,7 @@ impl<'a> App<'a> {
         }
     }
 
-    fn handle_resize_event(&mut self, width: u16, height: u16) {
+    fn set_size(&mut self, width: u16, height: u16) {
         let area = Rect::new(0, 0, width, height);
         let frame_set = Self::calculate_frames(area);
         self.directory.set_area(frame_set.directory);
