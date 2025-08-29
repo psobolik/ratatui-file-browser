@@ -4,7 +4,7 @@ description = "Ratatui File Browser"
 authors = ["Paul Sobolik <psobolik@zoho.com>"]
 license = "MIT"
 categories = ["command-line-interface", "filesystem"]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 publish = false
 
@@ -21,3 +21,10 @@ chrono = "0.4.31"
 clap = { version = "4.4.11", features = ["derive"] }
 number_prefix = "0.4.0"
 probably_binary = { git = "https://github.com/psobolik/probably-binary.git" }
+
+[profile.release]
+opt-level = 'z'     # Optimize for size
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations
+panic = 'abort'     # Abort on panic
+strip = true        # Strip symbols from binary
