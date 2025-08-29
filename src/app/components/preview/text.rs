@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Margin, Position, Rect};
-use ratatui::prelude::Line;
 use ratatui::widgets::{
     Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarPosition, ScrollbarState,
 };
@@ -29,7 +28,7 @@ pub(super) struct Text<'a> {
     entry: Option<PathBuf>,
 
     // The file's contents
-    file_text: Vec<String>,
+    lines: Vec<String>,
 
     // Horizontal scrollbar stuff
     widest_line_len: usize,
@@ -50,11 +49,8 @@ impl ListPane<String> for Text<'_> {
         self.set_area(area);
 
         self.entry = entry.cloned();
-        self.file_text = lines
-            .iter()
-            .map(|item| item.replace('\t', "        "))
-            .collect();
-        self.widest_line_len = Self::widest_line_length(&self.file_text);
+        self.lines = lines;
+        self.widest_line_len = Self::widest_line_length(&self.lines);
 
         self.vertical_scrollbar =
             Scrollbar::default().orientation(ScrollbarOrientation::VerticalRight);
@@ -65,7 +61,7 @@ impl ListPane<String> for Text<'_> {
 
     fn clear(&mut self) {
         self.entry = None;
-        self.file_text = vec![];
+        self.lines = vec![];
 
         self.set_scrollbar_state();
     }
@@ -306,12 +302,7 @@ impl PreviewPane for Text<'_> {
             let title = preview_pane::file_title(entry)?;
             let block = components::helpers::component_block(has_focus).title(title);
 
-            let items: Vec<Line> = self
-                .file_text
-                .iter()
-                .map(|item| Line::from(item.clone()))
-                .collect();
-            let paragraph = Paragraph::new(items.clone())
+            let paragraph = Paragraph::new(self.lines.join("\r\n"))
                 .scroll((self.vertical_offset as u16, self.horizontal_offset as u16));
             frame.render_widget(block, self.area);
             frame.render_widget(paragraph, self.inner_area);
@@ -337,11 +328,11 @@ impl Text<'_> {
     }
 
     fn can_scroll_vertically(&self) -> bool {
-        self.file_text.len() > self.inner_area.height as usize
+        self.lines.len() > self.inner_area.height as usize
     }
 
     fn vertical_page_limit(&self) -> usize {
-        <Self as PreviewPane>::page_limit(self.file_text.len(), self.inner_area.height as usize)
+        <Self as PreviewPane>::page_limit(self.lines.len(), self.inner_area.height as usize)
     }
 
     fn horizontal_page_limit(&self) -> usize {
@@ -373,7 +364,7 @@ impl Text<'_> {
 
     fn set_vertical_scrollbar_state(&mut self) {
         let frame_length = self.inner_area.height as usize;
-        if self.file_text.len() <= frame_length {
+        if self.lines.len() <= frame_length {
             // Hide scrollbar
             self.vertical_scrollbar_state =
                 self.vertical_scrollbar_state.position(0).content_length(0);
@@ -382,7 +373,7 @@ impl Text<'_> {
             // Show scrollbar
             self.vertical_scrollbar_state = self
                 .vertical_scrollbar_state
-                .content_length(self.file_text.len() - frame_length)
+                .content_length(self.lines.len() - frame_length)
                 .viewport_content_length(frame_length);
         };
     }

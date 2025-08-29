@@ -204,10 +204,6 @@ impl PreviewPane for Folder<'_> {
         }
         Ok(())
     }
-
-    fn page_limit(total_size: usize, page_size: usize) -> usize {
-        total_size.saturating_sub(page_size)
-    }
 }
 
 impl Folder<'_> {

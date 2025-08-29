@@ -17,11 +17,13 @@ use super::preview_pane::PreviewPane;
 pub(super) struct Other {
     // The file's directory entry
     entry: Option<PathBuf>,
+    message: String,
 }
 
 impl MessagePane for Other {
-    fn init(&mut self, entry: Option<&PathBuf>) {
+    fn init(&mut self, entry: Option<&PathBuf>, message: &str) {
         self.entry = entry.cloned();
+        self.message = message.to_string();
     }
 }
 
@@ -30,7 +32,7 @@ impl PreviewPane for Other {
         if let Some(entry) = &self.entry {
             <Self as MessagePane>::render_message(
                 entry,
-                "Unsupported File Type",
+                self.message.as_str(),
                 has_focus,
                 styles::OTHER_FILE_STYLE,
                 frame,

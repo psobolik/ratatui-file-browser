@@ -92,7 +92,7 @@ where
         self.state.select(index);
     }
 
-    pub fn iter(&self) -> std::slice::Iter<T> {
+    pub fn iter(&'_ self) -> std::slice::Iter<'_, T> {
         self.items.iter()
     }
 

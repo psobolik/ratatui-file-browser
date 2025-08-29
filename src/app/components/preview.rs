@@ -2,7 +2,7 @@
  * Copyright (c) 2024 Paul Sobolik
  * Created 2024-03-18
  */
-
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crossterm::event::{KeyEvent, MouseEvent};
@@ -11,7 +11,6 @@ use ratatui::layout::{Alignment, Position};
 use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::{layout::Rect, Frame};
 
-use binary::Binary;
 use folder::Folder;
 use list_pane::ListPane;
 use message_pane::MessagePane;
@@ -25,7 +24,6 @@ use crate::util;
 
 use super::Component;
 
-mod binary;
 mod folder;
 mod list_pane;
 mod message_pane;
@@ -39,6 +37,7 @@ enum PreviewType {
     TextFile,
     OversizeTextFile,
     BinaryFile,
+    OversizeBinaryFile,
     OtherFile,
     Error(String),
 }
@@ -54,7 +53,6 @@ pub struct Preview<'a> {
     // What kind of item the entry is
     preview_type: Option<PreviewType>,
 
-    binary_pane: Binary,
     other_pane: Other,
     oversize_pane: Oversize,
     folder_pane: Folder<'a>,
@@ -84,7 +82,7 @@ impl Component for Preview<'_> {
         if let Some(preview_type) = &self.preview_type {
             match preview_type {
                 PreviewType::Folder => self.folder_pane.handle_mouse_event(mouse_event),
-                PreviewType::TextFile => self.text_pane.handle_mouse_event(mouse_event),
+                PreviewType::TextFile | PreviewType::BinaryFile => self.text_pane.handle_mouse_event(mouse_event),
                 _ => {}
             }
         }
@@ -92,10 +90,10 @@ impl Component for Preview<'_> {
     }
 
     async fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<(), std::io::Error> {
-        if let Some(file_contents) = &self.preview_type {
-            match file_contents {
+        if let Some(preview_type) = &self.preview_type {
+            match preview_type {
                 PreviewType::Folder => self.folder_pane.handle_key_event(key_event),
-                PreviewType::TextFile => self.text_pane.handle_key_event(key_event),
+                PreviewType::TextFile | PreviewType::BinaryFile => self.text_pane.handle_key_event(key_event),
                 _ => {}
             }
         }
@@ -110,16 +108,15 @@ impl Component for Preview<'_> {
                 PreviewType::Folder => {
                     self.folder_pane.render(self.area, frame, self.has_focus)?;
                 }
-                PreviewType::TextFile => {
+                PreviewType::TextFile | PreviewType::BinaryFile => {
                     self.text_pane.render(self.area, frame, self.has_focus)?;
                 }
                 PreviewType::OversizeTextFile => {
                     self.oversize_pane
                         .render(self.area, frame, self.has_focus())?;
                 }
-                PreviewType::BinaryFile => {
-                    self.binary_pane.render(self.area, frame, self.has_focus)?;
-                }
+                PreviewType::OversizeBinaryFile =>
+                    self.oversize_pane.render(self.area, frame, self.has_focus())?,
                 PreviewType::OtherFile => {
                     self.other_pane.render(self.area, frame, self.has_focus())?;
                 }
@@ -137,7 +134,6 @@ impl Preview<'_> {
         self.entry = None;
         self.preview_type = None;
 
-        self.binary_pane.clear();
         self.other_pane.clear();
         self.oversize_pane.clear();
         self.folder_pane.clear();
@@ -161,6 +157,10 @@ impl Preview<'_> {
     pub fn set_text_file(&mut self, entry: &Path, lines: Vec<String>) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
+        let lines= lines
+            .iter()
+            .map(|item| item.replace('\t', "        ")) // TODO: This is not really right
+            .collect();
         self.text_pane
             .init(Some(&entry.to_path_buf()), lines, self.area);
         self.preview_type = Some(PreviewType::TextFile);
@@ -169,21 +169,29 @@ impl Preview<'_> {
     pub fn set_oversize_text_file(&mut self, entry: &Path) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.oversize_pane.init(Some(&entry.to_path_buf()));
+        self.oversize_pane.init(Some(&entry.to_path_buf()), "Oversize text file (max 50 kb)");
         self.preview_type = Some(PreviewType::OversizeTextFile);
     }
 
-    pub fn set_binary_file(&mut self, entry: &Path) {
+    pub fn set_binary_file(&mut self, entry: &Path, bytes: Vec<u8>) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.binary_pane.init(Some(&entry.to_path_buf()));
+        let lines = components::helpers::binary_to_lines(bytes);
+        self.text_pane.init(Some(&entry.to_path_buf()), lines, self.area);
         self.preview_type = Some(PreviewType::BinaryFile);
+    }
+
+    pub fn set_oversize_binary_file(&mut self, entry: &Path) {
+        self.clear();
+        self.entry = Some(PathBuf::from(entry));
+        self.oversize_pane.init(Some(&entry.to_path_buf()), "Oversize binary file (max 50 kb)");
+        self.preview_type = Some(PreviewType::OversizeBinaryFile);
     }
 
     pub fn set_other_file(&mut self, entry: &Path) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.other_pane.init(Some(&entry.to_path_buf()));
+        self.other_pane.init(Some(&entry.to_path_buf()), "Unsupported file type");
         self.preview_type = Some(PreviewType::OtherFile);
     }
 
@@ -223,7 +231,16 @@ impl Preview<'_> {
                     }
                 }
             }
-            FileType::Binary => self.set_binary_file(entry),
+            FileType::Binary => {
+                if util::file_size(entry) >= 50_000 {
+                    self.set_oversize_binary_file(entry);
+                } else {
+                    match fs::read(entry) {
+                        Ok(bytes) => self.set_binary_file(entry, bytes),
+                        Err(error) => self.set_error(entry, error.to_string()),
+                    }
+                }
+            }
         }
     }
 

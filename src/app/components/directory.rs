@@ -241,8 +241,7 @@ impl Directory {
         if let Some(cwd) = cwd {
             Ok(cwd)
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Err(std::io::Error::other(
                 "Can't find valid directory",
             ))
         }

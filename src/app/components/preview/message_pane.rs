@@ -15,9 +15,9 @@ use super::components;
 use super::preview_pane;
 
 pub trait MessagePane {
-    fn init(&mut self, entry: Option<&PathBuf>);
+    fn init(&mut self, entry: Option<&PathBuf>, message: &str);
     fn clear(&mut self) {
-        self.init(None)
+        self.init(None, "")
     }
 
     fn render_message(

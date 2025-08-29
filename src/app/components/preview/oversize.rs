@@ -18,11 +18,13 @@ use super::preview_pane::PreviewPane;
 pub(super) struct Oversize {
     // The file's directory entry
     entry: Option<PathBuf>,
+    message: String,
 }
 
 impl MessagePane for Oversize {
-    fn init(&mut self, entry: Option<&PathBuf>) {
+    fn init(&mut self, entry: Option<&PathBuf>, message: &str) {
         self.entry = entry.cloned();
+        self.message = message.to_string();
     }
 }
 
@@ -31,7 +33,7 @@ impl PreviewPane for Oversize {
         if let Some(entry) = &self.entry {
             <Self as MessagePane>::render_message(
                 entry,
-                "Oversize Text File (Max 50 kb)",
+                self.message.as_str(),
                 has_focus,
                 styles::OVERSIZE_FILE_STYLE,
                 frame,
