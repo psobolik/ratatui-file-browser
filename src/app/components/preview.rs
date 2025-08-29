@@ -22,7 +22,7 @@ use text::Text;
 use crate::app::{components, styles};
 use crate::util;
 
-use super::Component;
+use super::{helpers, Component};
 
 mod folder;
 mod list_pane;
@@ -159,7 +159,7 @@ impl Preview<'_> {
         self.entry = Some(PathBuf::from(entry));
         let lines= lines
             .iter()
-            .map(|item| item.replace('\t', "        ")) // TODO: This is not really right
+            .map(|line| helpers::expand_tabs(line, 8))
             .collect();
         self.text_pane
             .init(Some(&entry.to_path_buf()), lines, self.area);

@@ -45,7 +45,7 @@ pub(crate) fn component_block<'a>(has_focus: bool) -> Block<'a> {
 }
 // Returns an array of bytes formatted as lines of hex
 // 02cef870  4e f9 96 01 00 00 00 00  b9 ea e2 00 00 00 00 00  |N...............|
-pub fn binary_to_lines(bytes: Vec<u8>) -> Vec<String> {
+pub(crate) fn binary_to_lines(bytes: Vec<u8>) -> Vec<String> {
     const BYTES_PER_LINE: usize = 16;
     const BYTES_PER_HALF_LINE: usize = BYTES_PER_LINE / 2;
 
@@ -110,4 +110,20 @@ pub fn binary_to_lines(bytes: Vec<u8>) -> Vec<String> {
         index + BYTES_PER_LINE
     });
     lines
+}
+pub(crate) fn expand_tabs(string: &str, tab_size: usize) -> String {
+    let mut chars = vec![];
+    let mut index = 0;
+    string.chars().for_each(|char| {
+        if char == '\t' {
+            let c = tab_size - (index % tab_size);
+            chars.extend(vec![' '; c]);
+            chars.push(char);
+            index += c;
+        } else {
+            chars.push(char);
+            index += 1;
+        }
+    });
+    chars.into_iter().collect()
 }
