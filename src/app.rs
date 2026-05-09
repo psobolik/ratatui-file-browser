@@ -120,8 +120,10 @@ impl App<'_> {
 
     // Handle a key event, or send it to the focused pane
     async fn handle_key_event(&mut self, key_event: KeyEvent) {
-        // Ctrl+C closes the app, regardless of state
-        if Char('c') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL {
+        // Ctrl+C or Ctrl+Q closes the app, even if there's an error showing
+        if (Char('c') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
+            || (Char('q') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
+        {
             self.quit();
             return;
         }
@@ -130,7 +132,6 @@ impl App<'_> {
             return;
         }
         match key_event.code {
-            KeyCode::Esc => self.quit(),
             KeyCode::Tab => self.toggle_focus(),
             _ => {
                 if self.directory.has_focus() {
