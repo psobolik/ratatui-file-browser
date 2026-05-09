@@ -47,22 +47,20 @@ impl Component for Directory {
 
     async fn handle_mouse_event(&mut self, mouse_event: MouseEvent) -> Result<(), std::io::Error> {
         match mouse_event.kind {
-            MouseEventKind::Down(mouse_button) => {
+            MouseEventKind::Down(MouseButton::Left) => {
                 // A left click on the selected item is converted into an Enter key event.
                 // A left click on an unselected item selects it.
-                if mouse_button == MouseButton::Left {
-                    if let Some(index) = self.index_from_row(mouse_event.row) {
-                        if self.is_selected(index) {
-                            let key_event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
-                            self.handle_key_event(key_event).await?;
-                        } else {
-                            self.set_selected(index);
-                            self.event_tx
-                                .as_ref()
-                                .unwrap()
-                                .send(Event::SelectionChanged)
-                                .expect("Panic sending selection changed event");
-                        }
+                if let Some(index) = self.index_from_row(mouse_event.row) {
+                    if self.is_selected(index) {
+                        let key_event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+                        self.handle_key_event(key_event).await?;
+                    } else {
+                        self.set_selected(index);
+                        self.event_tx
+                            .as_ref()
+                            .unwrap()
+                            .send(Event::SelectionChanged)
+                            .expect("Panic sending selection changed event");
                     }
                 }
             }
@@ -241,9 +239,7 @@ impl Directory {
         if let Some(cwd) = cwd {
             Ok(cwd)
         } else {
-            Err(std::io::Error::other(
-                "Can't find valid directory",
-            ))
+            Err(std::io::Error::other("Can't find valid directory"))
         }
     }
 
@@ -295,7 +291,7 @@ impl Directory {
             .selected()
             .map(|selected| self.items[selected].clone())
     }
-    
+
     fn has_parent_directory(&self) -> bool {
         util::entry_name(&self.items[0]) == constants::PARENT_DIRECTORY && self.items.len() > 0
     }

@@ -82,7 +82,9 @@ impl Component for Preview<'_> {
         if let Some(preview_type) = &self.preview_type {
             match preview_type {
                 PreviewType::Folder => self.folder_pane.handle_mouse_event(mouse_event),
-                PreviewType::TextFile | PreviewType::BinaryFile => self.text_pane.handle_mouse_event(mouse_event),
+                PreviewType::TextFile | PreviewType::BinaryFile => {
+                    self.text_pane.handle_mouse_event(mouse_event)
+                }
                 _ => {}
             }
         }
@@ -93,7 +95,9 @@ impl Component for Preview<'_> {
         if let Some(preview_type) = &self.preview_type {
             match preview_type {
                 PreviewType::Folder => self.folder_pane.handle_key_event(key_event),
-                PreviewType::TextFile | PreviewType::BinaryFile => self.text_pane.handle_key_event(key_event),
+                PreviewType::TextFile | PreviewType::BinaryFile => {
+                    self.text_pane.handle_key_event(key_event)
+                }
                 _ => {}
             }
         }
@@ -115,8 +119,10 @@ impl Component for Preview<'_> {
                     self.oversize_pane
                         .render(self.area, frame, self.has_focus())?;
                 }
-                PreviewType::OversizeBinaryFile =>
-                    self.oversize_pane.render(self.area, frame, self.has_focus())?,
+                PreviewType::OversizeBinaryFile => {
+                    self.oversize_pane
+                        .render(self.area, frame, self.has_focus())?
+                }
                 PreviewType::OtherFile => {
                     self.other_pane.render(self.area, frame, self.has_focus())?;
                 }
@@ -157,7 +163,7 @@ impl Preview<'_> {
     pub fn set_text_file(&mut self, entry: &Path, lines: Vec<String>) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        let lines= lines
+        let lines = lines
             .iter()
             .map(|line| helpers::expand_tabs(line, 8))
             .collect();
@@ -169,7 +175,8 @@ impl Preview<'_> {
     pub fn set_oversize_text_file(&mut self, entry: &Path) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.oversize_pane.init(Some(&entry.to_path_buf()), "Oversize text file (max 50 kb)");
+        self.oversize_pane
+            .init(Some(&entry.to_path_buf()), "Oversize text file (max 50 kb)");
         self.preview_type = Some(PreviewType::OversizeTextFile);
     }
 
@@ -177,21 +184,26 @@ impl Preview<'_> {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
         let lines = components::helpers::binary_to_lines(bytes);
-        self.text_pane.init(Some(&entry.to_path_buf()), lines, self.area);
+        self.text_pane
+            .init(Some(&entry.to_path_buf()), lines, self.area);
         self.preview_type = Some(PreviewType::BinaryFile);
     }
 
     pub fn set_oversize_binary_file(&mut self, entry: &Path) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.oversize_pane.init(Some(&entry.to_path_buf()), "Oversize binary file (max 50 kb)");
+        self.oversize_pane.init(
+            Some(&entry.to_path_buf()),
+            "Oversize binary file (max 50 kb)",
+        );
         self.preview_type = Some(PreviewType::OversizeBinaryFile);
     }
 
     pub fn set_other_file(&mut self, entry: &Path) {
         self.clear();
         self.entry = Some(PathBuf::from(entry));
-        self.other_pane.init(Some(&entry.to_path_buf()), "Unsupported file type");
+        self.other_pane
+            .init(Some(&entry.to_path_buf()), "Unsupported file type");
         self.preview_type = Some(PreviewType::OtherFile);
     }
 

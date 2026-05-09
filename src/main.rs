@@ -26,7 +26,7 @@ async fn run() -> Result<()> {
             })?;
         }
         app.handle_event(event).await;
-        if app.should_quit {
+        if app.should_quit() {
             break;
         }
     }

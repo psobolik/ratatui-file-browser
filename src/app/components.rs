@@ -5,8 +5,8 @@
 pub(crate) mod component;
 pub(crate) mod directory;
 pub(crate) mod head;
-pub(crate) mod preview;
 pub(crate) mod helpers;
+pub(crate) mod preview;
 
 pub(crate) use component::Component;
 pub(crate) use directory::Directory;

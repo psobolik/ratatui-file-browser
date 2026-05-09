@@ -4,7 +4,7 @@ description = "Ratatui File Browser"
 authors = ["Paul Sobolik <psobolik@zoho.com>"]
 license = "MIT"
 categories = ["command-line-interface", "filesystem"]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 publish = false
 

@@ -2,14 +2,13 @@
  * Copyright (c) 2023-2024 Paul Sobolik
  * Created 2024-03-18
  */
-use std::io;
-
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use crossterm::{
     event::KeyCode::Char,
     event::{KeyCode, KeyEvent, KeyModifiers},
 };
 use ratatui::{prelude::*, widgets::*};
+use std::io;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::app::{
@@ -28,7 +27,7 @@ struct FrameSet {
 
 #[derive(Default)]
 pub struct App<'a> {
-    pub should_quit: bool,
+    should_quit: bool,
     fs_error: Option<io::Error>,
 
     // Components
@@ -38,6 +37,10 @@ pub struct App<'a> {
 }
 
 impl App<'_> {
+    pub fn should_quit(&self) -> bool {
+        self.should_quit
+    }
+
     pub fn set_event_tx(&mut self, event_tx: Option<UnboundedSender<Event>>) {
         self.directory.set_event_tx(event_tx);
     }
@@ -121,8 +124,8 @@ impl App<'_> {
     // Handle a key event, or send it to the focused pane
     async fn handle_key_event(&mut self, key_event: KeyEvent) {
         // Ctrl+C or Ctrl+Q closes the app, even if there's an error showing
-        if (Char('c') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
-            || (Char('q') == key_event.code && key_event.modifiers == KeyModifiers::CONTROL)
+        if Char('c') == key_event.code
+            || (Char('q') == key_event.code) && key_event.modifiers == KeyModifiers::CONTROL
         {
             self.quit();
             return;

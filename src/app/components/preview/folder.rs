@@ -55,37 +55,32 @@ impl ListPane<PathBuf> for Folder<'_> {
 
     fn handle_mouse_event(&mut self, mouse_event: MouseEvent) {
         match mouse_event.kind {
-            MouseEventKind::Down(mouse_button) => {
-                if mouse_button == MouseButton::Left {
-                    let position = Position {
-                        x: mouse_event.column,
-                        y: mouse_event.row,
-                    };
-                    match self.scrollbar.hit_test(
-                        position,
-                        self.scrollbar_area,
-                        &self.scrollbar_state,
-                    ) {
-                        None => {}
-                        Some(scrollbar_position) => {
-                            match scrollbar_position {
-                                ScrollbarPosition::Begin => self.handle_key_event(KeyEvent::new(
-                                    KeyCode::Up,
-                                    KeyModifiers::NONE,
-                                )),
-                                ScrollbarPosition::TrackLow => self.handle_key_event(
-                                    KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE),
-                                ),
-                                // ScrollbarPosition::Thumb => {}
-                                ScrollbarPosition::TrackHigh => self.handle_key_event(
-                                    KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE),
-                                ),
-                                ScrollbarPosition::End => self.handle_key_event(KeyEvent::new(
-                                    KeyCode::Down,
-                                    KeyModifiers::NONE,
-                                )),
-                                _ => {}
-                            }
+            MouseEventKind::Down(MouseButton::Left) => {
+                let position = Position {
+                    x: mouse_event.column,
+                    y: mouse_event.row,
+                };
+                match self
+                    .scrollbar
+                    .hit_test(position, self.scrollbar_area, &self.scrollbar_state)
+                {
+                    None => {}
+                    Some(scrollbar_position) => {
+                        match scrollbar_position {
+                            ScrollbarPosition::Begin => self
+                                .handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)),
+                            ScrollbarPosition::TrackLow => self.handle_key_event(KeyEvent::new(
+                                KeyCode::PageUp,
+                                KeyModifiers::NONE,
+                            )),
+                            // ScrollbarPosition::Thumb => {}
+                            ScrollbarPosition::TrackHigh => self.handle_key_event(KeyEvent::new(
+                                KeyCode::PageDown,
+                                KeyModifiers::NONE,
+                            )),
+                            ScrollbarPosition::End => self
+                                .handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)),
+                            _ => {}
                         }
                     }
                 }
@@ -119,19 +114,15 @@ impl ListPane<PathBuf> for Folder<'_> {
             }
         } else {
             match key_event.code {
-                KeyCode::Home => {
+                KeyCode::Home if !self.entry_list.at_offset_first() => {
                     // Scroll to top of list
-                    if !self.entry_list.at_offset_first() {
-                        self.entry_list.offset_first();
-                        self.scrollbar_state.first();
-                    }
+                    self.entry_list.offset_first();
+                    self.scrollbar_state.first();
                 }
-                KeyCode::End => {
+                KeyCode::End if self.entry_list.len() > self.inner_area.height as usize => {
                     // Scroll to end of list
-                    if self.entry_list.len() > self.inner_area.height as usize {
-                        self.entry_list.set_offset(self.vertical_page_limit());
-                        self.scrollbar_state.last();
-                    }
+                    self.entry_list.set_offset(self.vertical_page_limit());
+                    self.scrollbar_state.last();
                 }
                 KeyCode::PageUp => {
                     // Scroll up one page
